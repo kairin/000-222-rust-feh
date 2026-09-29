@@ -1,0 +1,2840 @@
+{
+  "baseline": "6c1823abe2f3835f7d74f630357e6610e9a3ac4b",
+  "project": "/home/kkk/Apps/rust-feh",
+  "workspace_root": "/home/kkk/.cline/kanban-review-workspaces/rust-feh",
+  "boards": [
+    {
+      "id": "BOOT-01",
+      "group": "Startup and lifecycle",
+      "title": "Startup detection and GUI failure recovery",
+      "sources": [
+        "/home/kkk/Apps/rust-feh/src/main.rs",
+        "/home/kkk/Apps/rust-feh/src/tool_caps.rs",
+        "/home/kkk/Apps/rust-feh/specs/006-window-viewer-stability/spec.md"
+      ],
+      "symbols": [
+        "try_run_gui",
+        "detect_app_state",
+        "build_native_options",
+        "handle_gui_failure"
+      ],
+      "tests": [
+        "cargo test --lib tool_caps::tests -- --nocapture"
+      ],
+      "normal": [
+        "Healthy startup initializes one app",
+        "Missing feh produces actionable initial state"
+      ],
+      "adverse": [
+        "Unavailable display/backend",
+        "Failed GUI fallback preserves an actionable error"
+      ],
+      "cases": [
+        "Healthy startup initializes one app",
+        "Missing feh produces actionable initial state",
+        "Unavailable display/backend",
+        "Failed GUI fallback preserves an actionable error"
+      ],
+      "acceptance": "Startup and fallback do not silently succeed or lose required dependency warnings.",
+      "metric": "Measure startup wall time and probe count separately from first-folder load.",
+      "related": [
+        "CAP-01",
+        "PREF-01"
+      ],
+      "requires": [
+        "display",
+        "feh"
+      ]
+    },
+    {
+      "id": "BOOT-02",
+      "group": "Startup and lifecycle",
+      "title": "Startup folder and first-frame behavior",
+      "sources": [
+        "/home/kkk/Apps/rust-feh/src/main.rs",
+        "/home/kkk/Apps/rust-feh/specs/017-lazy-folder-scanning/spec.md",
+        "/home/kkk/Apps/rust-feh/specs/018-inspector-ux-rework/spec.md"
+      ],
+      "symbols": [
+        "maybe_load_start_folder",
+        "navigate_to_folder",
+        "sync_auto_expand_folder_edge"
+      ],
+      "tests": [
+        "cargo test --test unit_ui_logic initial_open_sections -- --nocapture"
+      ],
+      "normal": [
+        "No folder starts with Browse available",
+        "Valid start folder is loaded once"
+      ],
+      "adverse": [
+        "Missing or invalid start-folder path",
+        "First-frame scan must not fight user drawer state"
+      ],
+      "cases": [
+        "No folder starts with Browse available",
+        "Valid start folder is loaded once",
+        "Missing or invalid start-folder path",
+        "First-frame scan must not fight user drawer state"
+      ],
+      "acceptance": "The startup hook is one-shot, invalid input is explained, and folder/scan state is consistent.",
+      "metric": "Count startup scans and first-frame work; do not add repeated filesystem probes.",
+      "related": [
+        "NAV-01",
+        "INSP-02"
+      ],
+      "requires": [
+        "display"
+      ]
+    },
+    {
+      "id": "LIFE-01",
+      "group": "Startup and lifecycle",
+      "title": "Shutdown and owned resource lifetime",
+      "sources": [
+        "/home/kkk/Apps/rust-feh/src/main.rs",
+        "/home/kkk/Apps/rust-feh/src/ui_logic.rs",
+        "/home/kkk/Apps/rust-feh/specs/013-image-tools-magick-cache/spec.md"
+      ],
+      "symbols": [
+        "drop",
+        "cancel_tools_job",
+        "cleanup_prepare_fast_temp",
+        "cleanup_stale_handoffs"
+      ],
+      "tests": [
+        "cargo test --lib cleanup_stale_handoffs -- --nocapture"
+      ],
+      "normal": [
+        "Idle close releases task-owned resources",
+        "Close after preparation cleans only owned files"
+      ],
+      "adverse": [
+        "Close while batch/scan/decode is active",
+        "Viewer still using prepared files",
+        "Unrelated similarly named files"
+      ],
+      "cases": [
+        "Idle close releases task-owned resources",
+        "Close after preparation cleans only owned files",
+        "Close while batch/scan/decode is active",
+        "Viewer still using prepared files",
+        "Unrelated similarly named files"
+      ],
+      "acceptance": "No unrelated files/processes are removed; running readers and background writers have defined lifetime.",
+      "metric": "Measure residual processes, temporary files and memory after repeated open/close cycles.",
+      "related": [
+        "CACHE-05",
+        "VIEW-05"
+      ],
+      "requires": [
+        "display",
+        "feh"
+      ]
+    },
+    {
+      "id": "PREF-01",
+      "group": "Preferences and persistence",
+      "title": "Window size, lock and persistence",
+      "sources": [
+        "/home/kkk/Apps/rust-feh/src/main.rs",
+        "/home/kkk/Apps/rust-feh/src/ui_logic.rs",
+        "/home/kkk/Apps/rust-feh/src/types.rs",
+        "/home/kkk/Apps/rust-feh/tests/unit/ui_logic.rs",
+        "/home/kkk/Apps/rust-feh/specs/006-window-viewer-stability/spec.md"
+      ],
+      "symbols": [
+        "load_window_prefs",
+        "save_window_prefs",
+        "apply_startup_window_prefs",
+        "apply_window_resize_policy"
+      ],
+      "tests": [
+        "cargo test --test unit_ui_logic window_prefs -- --nocapture",
+        "cargo test --lib clamp_window_size -- --nocapture"
+      ],
+      "normal": [
+        "Preset persists across restart",
+        "Resizable and locked modes honor bounds"
+      ],
+      "adverse": [
+        "Missing or corrupt JSON",
+        "Unwritable config directory",
+        "Small viewport or changed display scale"
+      ],
+      "cases": [
+        "Preset persists across restart",
+        "Resizable and locked modes honor bounds",
+        "Missing or corrupt JSON",
+        "Unwritable config directory",
+        "Small viewport or changed display scale"
+      ],
+      "acceptance": "Safe defaults and useful errors; runtime geometry matches persisted contract without resize loops.",
+      "metric": "Count configuration writes and viewport commands during idle frames.",
+      "related": [
+        "INSP-01",
+        "BOOT-01"
+      ],
+      "requires": [
+        "isolated-home",
+        "display"
+      ]
+    },
+    {
+      "id": "PREF-02",
+      "group": "Preferences and persistence",
+      "title": "Launch-entry persistence and identity",
+      "sources": [
+        "/home/kkk/Apps/rust-feh/src/ui_logic.rs",
+        "/home/kkk/Apps/rust-feh/src/types.rs",
+        "/home/kkk/Apps/rust-feh/src/main.rs",
+        "/home/kkk/Apps/rust-feh/tests/unit/ui_logic.rs",
+        "/home/kkk/Apps/rust-feh/specs/014-multi-feh-clipboard/spec.md"
+      ],
+      "symbols": [
+        "save_launch_list",
+        "load_launch_list",
+        "persist_launch_entries",
+        "FehLaunchList"
+      ],
+      "tests": [
+        "cargo test --test unit_ui_logic test_launch_list -- --nocapture"
+      ],
+      "normal": [
+        "Add/edit/remove entries then reload",
+        "Distinct IDs survive serialization"
+      ],
+      "adverse": [
+        "Corrupt or missing file",
+        "Write failure",
+        "Labels and paths with Unicode"
+      ],
+      "cases": [
+        "Add/edit/remove entries then reload",
+        "Distinct IDs survive serialization",
+        "Corrupt or missing file",
+        "Write failure",
+        "Labels and paths with Unicode"
+      ],
+      "acceptance": "Persistence neither drops unrelated entries nor confuses identity; failures do not masquerade as saved data.",
+      "metric": "Measure writes per edit and reload time with many entries; no per-frame writes.",
+      "related": [
+        "VIEW-02"
+      ],
+      "requires": [
+        "isolated-home"
+      ]
+    },
+    {
+      "id": "PREF-03",
+      "group": "Preferences and persistence",
+      "title": "Action destinations and safe configuration writes",
+      "sources": [
+        "/home/kkk/Apps/rust-feh/src/ui_logic.rs",
+        "/home/kkk/Apps/rust-feh/src/main.rs",
+        "/home/kkk/Apps/rust-feh/src/types.rs",
+        "/home/kkk/Apps/rust-feh/tests/unit/ui_logic.rs",
+        "/home/kkk/Apps/rust-feh/specs/016-feh-viewer-actions/spec.md"
+      ],
+      "symbols": [
+        "save_action_prefs_to",
+        "load_action_prefs_from",
+        "pick_action_destination",
+        "ActionPrefs"
+      ],
+      "tests": [
+        "cargo test --lib action_prefs -- --nocapture"
+      ],
+      "normal": [
+        "Selected destination survives reload",
+        "Cancelled destination picker changes nothing"
+      ],
+      "adverse": [
+        "Malformed or missing preferences",
+        "Interrupted/unwritable save",
+        "Destination disappears"
+      ],
+      "cases": [
+        "Selected destination survives reload",
+        "Cancelled destination picker changes nothing",
+        "Malformed or missing preferences",
+        "Interrupted/unwritable save",
+        "Destination disappears"
+      ],
+      "acceptance": "Preferences recover safely and cannot redirect actions silently to a stale or unintended location.",
+      "metric": "Check write frequency and blocking filesystem work on action selection.",
+      "related": [
+        "ACT-01",
+        "ACT-02"
+      ],
+      "requires": [
+        "isolated-home"
+      ]
+    },
+    {
+      "id": "SCAN-01",
+      "group": "Discovery",
+      "title": "Native classification without pixel decoding",
+      "sources": [
+        "/home/kkk/Apps/rust-feh/src/scanner.rs",
+        "/home/kkk/Apps/rust-feh/src/types.rs",
+        "/home/kkk/Apps/rust-feh/tests/feature_001_validation.rs",
+        "/home/kkk/Apps/rust-feh/specs/005-image-list-presentation/spec.md"
+      ],
+      "symbols": [
+        "is_native_image",
+        "is_obvious_non_image",
+        "classify_walk_file"
+      ],
+      "tests": [
+        "cargo test --lib scanner::tests -- --nocapture",
+        "cargo test --test feature_001_validation scan_10k_supported_files -- --nocapture"
+      ],
+      "normal": [
+        "Supported extensions and case variants",
+        "Empty directory and non-image files"
+      ],
+      "adverse": [
+        "Misleading extension and corrupt bytes",
+        "Extensionless paths and unusual names"
+      ],
+      "cases": [
+        "Supported extensions and case variants",
+        "Empty directory and non-image files",
+        "Misleading extension and corrupt bytes",
+        "Extensionless paths and unusual names"
+      ],
+      "acceptance": "Listing classification follows its extension contract without decoding full images or claiming decodability.",
+      "metric": "Measure classification throughput on 1k and 10k metadata-only entries.",
+      "related": [
+        "SCAN-04",
+        "STAGE-01"
+      ],
+      "requires": [
+        "fixture"
+      ]
+    },
+    {
+      "id": "SCAN-02",
+      "group": "Discovery",
+      "title": "Traversal, recursion and filesystem boundaries",
+      "sources": [
+        "/home/kkk/Apps/rust-feh/src/scanner.rs",
+        "/home/kkk/Apps/rust-feh/tests/feature_001_validation.rs",
+        "/home/kkk/Apps/rust-feh/specs/011-browsing-experience-round/spec.md"
+      ],
+      "symbols": [
+        "walk_scan_files",
+        "scan_images",
+        "scan_images_streaming"
+      ],
+      "tests": [
+        "cargo test --test feature_001_validation v5_recursive_scan_includes_subdirs -- --nocapture",
+        "cargo test --lib scanner::tests -- --nocapture"
+      ],
+      "normal": [
+        "Shallow scan excludes nested files",
+        "Recursive scan covers nested folders"
+      ],
+      "adverse": [
+        "Symlink cycle and escape",
+        "Missing root and unreadable child",
+        "Root removed during traversal"
+      ],
+      "cases": [
+        "Shallow scan excludes nested files",
+        "Recursive scan covers nested folders",
+        "Symlink cycle and escape",
+        "Missing root and unreadable child",
+        "Root removed during traversal"
+      ],
+      "acceptance": "Traversal follows declared recursion/symlink policy and returns usable results with accurate warnings.",
+      "metric": "Measure scaling with depth/file count and repeated metadata calls.",
+      "related": [
+        "SCAN-03",
+        "SCAN-06"
+      ],
+      "requires": [
+        "fixture"
+      ]
+    },
+    {
+      "id": "SCAN-03",
+      "group": "Discovery",
+      "title": "Warning classification and bounded summaries",
+      "sources": [
+        "/home/kkk/Apps/rust-feh/src/scanner.rs",
+        "/home/kkk/Apps/rust-feh/tests/feature_001_validation.rs",
+        "/home/kkk/Apps/rust-feh/specs/011-browsing-experience-round/spec.md"
+      ],
+      "symbols": [
+        "format_walk_warning",
+        "summarize_scan_warnings",
+        "SCAN_WARNING_CAP"
+      ],
+      "tests": [
+        "cargo test --lib format_walk_warning -- --nocapture",
+        "cargo test --test feature_001_validation t068 -- --nocapture",
+        "cargo test --test feature_001_validation t069 -- --nocapture"
+      ],
+      "normal": [
+        "Permission warning preserves reason",
+        "Non-permission walk failure is visible"
+      ],
+      "adverse": [
+        "More than warning cap",
+        "Repeated errors",
+        "Tests running with privileges that bypass permissions"
+      ],
+      "cases": [
+        "Permission warning preserves reason",
+        "Non-permission walk failure is visible",
+        "More than warning cap",
+        "Repeated errors",
+        "Tests running with privileges that bypass permissions"
+      ],
+      "acceptance": "Warning count/omission summary is accurate; permission tests prove the error actually occurred.",
+      "metric": "Measure warning allocation/log growth for error-heavy trees.",
+      "related": [
+        "OBS-02"
+      ],
+      "requires": [
+        "fixture"
+      ]
+    },
+    {
+      "id": "SCAN-04",
+      "group": "Discovery",
+      "title": "External format probing, budget and cancellation",
+      "sources": [
+        "/home/kkk/Apps/rust-feh/src/scanner.rs",
+        "/home/kkk/Apps/rust-feh/src/tool_caps.rs",
+        "/home/kkk/Apps/rust-feh/specs/017-lazy-folder-scanning/spec.md"
+      ],
+      "symbols": [
+        "try_magick_probe",
+        "is_magick_image",
+        "MAGICK_IDENTIFY_CAP",
+        "resolve_magick_bin"
+      ],
+      "tests": [
+        "cargo test --lib scanner::tests -- --nocapture"
+      ],
+      "normal": [
+        "Successful external classification",
+        "Disabled probe makes no subprocess calls"
+      ],
+      "adverse": [
+        "All probes fail: attempted-call cap versus success count",
+        "Slow/hung probe during cancellation",
+        "Missing executable and adversarial path"
+      ],
+      "cases": [
+        "Successful external classification",
+        "Disabled probe makes no subprocess calls",
+        "All probes fail: attempted-call cap versus success count",
+        "Slow/hung probe during cancellation",
+        "Missing executable and adversarial path"
+      ],
+      "acceptance": "Record actual subprocess attempts, truncation and cancellation behavior; demonstrate any contract violation before fixing.",
+      "metric": "Count launches and bound probe latency; inspect whether the cap applies to attempted or successful probes.",
+      "related": [
+        "SCAN-06",
+        "CAP-02"
+      ],
+      "requires": [
+        "fake-executable",
+        "magick"
+      ]
+    },
+    {
+      "id": "SCAN-05",
+      "group": "Discovery",
+      "title": "Network-path policy and expensive metadata",
+      "sources": [
+        "/home/kkk/Apps/rust-feh/src/ui_logic.rs",
+        "/home/kkk/Apps/rust-feh/src/scanner.rs",
+        "/home/kkk/Apps/rust-feh/src/main.rs",
+        "/home/kkk/Apps/rust-feh/specs/012-ui-feedback-polish/spec.md"
+      ],
+      "symbols": [
+        "is_network_mount_path",
+        "scan_magick_enabled",
+        "scan_directory"
+      ],
+      "tests": [
+        "cargo test --lib network_mount_path -- --nocapture",
+        "cargo test --lib scan_magick_enabled -- --nocapture"
+      ],
+      "normal": [
+        "Recognized GVFS/SMB/NFS-like paths apply policy",
+        "Local path retains intended probe policy"
+      ],
+      "adverse": [
+        "Unrecognized mount naming",
+        "Explicit format override",
+        "Slow directory metadata"
+      ],
+      "cases": [
+        "Recognized GVFS/SMB/NFS-like paths apply policy",
+        "Local path retains intended probe policy",
+        "Unrecognized mount naming",
+        "Explicit format override",
+        "Slow directory metadata"
+      ],
+      "acceptance": "Policy and user-facing explanation agree; simulated path classification is not claimed as a real NAS test.",
+      "metric": "Count metadata/probe work and record a real-network requirement separately from deterministic tests.",
+      "related": [
+        "NAV-02",
+        "CAP-03"
+      ],
+      "requires": [
+        "fixture",
+        "network-optional"
+      ]
+    },
+    {
+      "id": "SCAN-06",
+      "group": "Scan lifecycle",
+      "title": "Superseded worker cancellation",
+      "sources": [
+        "/home/kkk/Apps/rust-feh/src/main.rs",
+        "/home/kkk/Apps/rust-feh/src/scanner.rs",
+        "/home/kkk/Apps/rust-feh/src/ui_logic.rs",
+        "/home/kkk/Apps/rust-feh/specs/017-lazy-folder-scanning/spec.md"
+      ],
+      "symbols": [
+        "scan_directory",
+        "walk_scan_files",
+        "apply_converted_detection_cancellable"
+      ],
+      "tests": [
+        "cargo test --lib apply_converted_detection_cancellable -- --nocapture",
+        "cargo test --lib scanner::tests -- --nocapture"
+      ],
+      "normal": [
+        "New scan cancels prior walk",
+        "Pre-cancelled converted pass exits"
+      ],
+      "adverse": [
+        "Rapid A-B-A navigation",
+        "Cancellation during external probe",
+        "Cancellation near completion"
+      ],
+      "cases": [
+        "New scan cancels prior walk",
+        "Pre-cancelled converted pass exits",
+        "Rapid A-B-A navigation",
+        "Cancellation during external probe",
+        "Cancellation near completion"
+      ],
+      "acceptance": "Cancellation stops unnecessary work without suppressing the current scan; latency and limitations are evidenced.",
+      "metric": "Measure cancellation-to-last-work latency and surviving thread/process count.",
+      "related": [
+        "SCAN-04",
+        "SCAN-07"
+      ],
+      "requires": [
+        "fixture"
+      ]
+    },
+    {
+      "id": "SCAN-07",
+      "group": "Scan lifecycle",
+      "title": "Partial/completion ordering and generation rejection",
+      "sources": [
+        "/home/kkk/Apps/rust-feh/src/main.rs",
+        "/home/kkk/Apps/rust-feh/specs/011-browsing-experience-round/spec.md",
+        "/home/kkk/Apps/rust-feh/specs/017-lazy-folder-scanning/spec.md"
+      ],
+      "symbols": [
+        "apply_scan_partial",
+        "handle_scan_msg",
+        "poll_scan_complete",
+        "ScanMsg"
+      ],
+      "tests": [
+        "cargo test --test feature_001_validation -- --nocapture"
+      ],
+      "normal": [
+        "Current partial followed by complete",
+        "Several partials coalesce to newest"
+      ],
+      "adverse": [
+        "Old-generation partial/complete/converted events",
+        "Mixed queued generations",
+        "Completion then late event"
+      ],
+      "cases": [
+        "Current partial followed by complete",
+        "Several partials coalesce to newest",
+        "Old-generation partial/complete/converted events",
+        "Mixed queued generations",
+        "Completion then late event"
+      ],
+      "acceptance": "Deterministic event traces prove only valid updates apply and final list, inventory and scanning flag agree.",
+      "metric": "Measure full-list copying/coalescing cost and backlog growth under fast producers.",
+      "related": [
+        "SCAN-08",
+        "LIST-03"
+      ],
+      "requires": [
+        "fixture"
+      ]
+    },
+    {
+      "id": "SCAN-08",
+      "group": "Scan lifecycle",
+      "title": "Converted merge and live inventory preservation",
+      "sources": [
+        "/home/kkk/Apps/rust-feh/src/main.rs",
+        "/home/kkk/Apps/rust-feh/src/ui_logic.rs",
+        "/home/kkk/Apps/rust-feh/src/types.rs",
+        "/home/kkk/Apps/rust-feh/specs/018-inspector-ux-rework/spec.md"
+      ],
+      "symbols": [
+        "merge_converted_statuses",
+        "handle_scan_msg",
+        "ScanInventory"
+      ],
+      "tests": [
+        "cargo test --lib merge_converted -- --nocapture",
+        "cargo test --lib inventory_rebuilt_from_live_list -- --nocapture"
+      ],
+      "normal": [
+        "Matching path upgrades status",
+        "Unmatched live entry remains"
+      ],
+      "adverse": [
+        "User add/move/rename before converted snapshot",
+        "Already-converted live state",
+        "Snapshot-only removed path"
+      ],
+      "cases": [
+        "Matching path upgrades status",
+        "Unmatched live entry remains",
+        "User add/move/rename before converted snapshot",
+        "Already-converted live state",
+        "Snapshot-only removed path"
+      ],
+      "acceptance": "No resurrection, lost mutation or downgrade; live inventory and revision invalidation reflect the merged list.",
+      "metric": "Measure merge complexity and inventory rebuild at large counts.",
+      "related": [
+        "ACT-02",
+        "BATCH-04",
+        "LIST-04"
+      ],
+      "requires": [
+        "fixture"
+      ]
+    },
+    {
+      "id": "NAV-01",
+      "group": "Folder navigation",
+      "title": "Unified picker, Up and breadcrumb navigation",
+      "sources": [
+        "/home/kkk/Apps/rust-feh/src/main.rs",
+        "/home/kkk/Apps/rust-feh/specs/017-lazy-folder-scanning/spec.md"
+      ],
+      "symbols": [
+        "navigate_to_folder",
+        "pick_folder",
+        "render_inspector_nav_strip"
+      ],
+      "tests": [
+        "cargo test --test unit_ui_logic list_subfolders -- --nocapture"
+      ],
+      "normal": [
+        "Picker/subfolder/Up use same navigation semantics",
+        "Root breadcrumb stops at filesystem root"
+      ],
+      "adverse": [
+        "Picker cancel",
+        "Folder removed before navigation",
+        "Rapid successive requests"
+      ],
+      "cases": [
+        "Picker/subfolder/Up use same navigation semantics",
+        "Root breadcrumb stops at filesystem root",
+        "Picker cancel",
+        "Folder removed before navigation",
+        "Rapid successive requests"
+      ],
+      "acceptance": "All entry points set folder/search/selection consistently and do not cause duplicate scans.",
+      "metric": "Measure navigation-to-first-result and redundant scan/subfolder requests.",
+      "related": [
+        "BOOT-02",
+        "SCAN-06"
+      ],
+      "requires": [
+        "display"
+      ]
+    },
+    {
+      "id": "NAV-02",
+      "group": "Folder navigation",
+      "title": "Asynchronous subfolder discovery",
+      "sources": [
+        "/home/kkk/Apps/rust-feh/src/main.rs",
+        "/home/kkk/Apps/rust-feh/src/ui_logic.rs",
+        "/home/kkk/Apps/rust-feh/tests/unit/ui_logic.rs",
+        "/home/kkk/Apps/rust-feh/specs/017-lazy-folder-scanning/spec.md"
+      ],
+      "symbols": [
+        "list_subfolders",
+        "request_subfolders",
+        "poll_subfolders",
+        "SubfolderMsg"
+      ],
+      "tests": [
+        "cargo test --test unit_ui_logic list_subfolders -- --nocapture"
+      ],
+      "normal": [
+        "Sorted immediate directories only",
+        "Empty folder clears prior subfolder rows"
+      ],
+      "adverse": [
+        "Late result from previous folder",
+        "Permission/missing root",
+        "Slow path with rapid navigation"
+      ],
+      "cases": [
+        "Sorted immediate directories only",
+        "Empty folder clears prior subfolder rows",
+        "Late result from previous folder",
+        "Permission/missing root",
+        "Slow path with rapid navigation"
+      ],
+      "acceptance": "Stale generations cannot populate current navigation; pending state clears on all completion paths.",
+      "metric": "Measure requests per navigation and ensure render does not rewalk folders.",
+      "related": [
+        "SCAN-05",
+        "NAV-01"
+      ],
+      "requires": [
+        "fixture"
+      ]
+    },
+    {
+      "id": "NAV-03",
+      "group": "Folder navigation",
+      "title": "Rescan selection and recursive-mode transitions",
+      "sources": [
+        "/home/kkk/Apps/rust-feh/src/main.rs",
+        "/home/kkk/Apps/rust-feh/specs/017-lazy-folder-scanning/spec.md",
+        "/home/kkk/Apps/rust-feh/specs/018-inspector-ux-rework/spec.md"
+      ],
+      "symbols": [
+        "scan_directory",
+        "apply_scan_result",
+        "pending_select_path",
+        "selected_tree_folder"
+      ],
+      "tests": [
+        "cargo test --test feature_001_validation v5_recursive_scan_includes_subdirs -- --nocapture"
+      ],
+      "normal": [
+        "Rescan current folder",
+        "Switch shallow to recursive and back"
+      ],
+      "adverse": [
+        "Pending viewer landing during active scan",
+        "Selected file deleted",
+        "Old tree folder after folder change"
+      ],
+      "cases": [
+        "Rescan current folder",
+        "Switch shallow to recursive and back",
+        "Pending viewer landing during active scan",
+        "Selected file deleted",
+        "Old tree folder after folder change"
+      ],
+      "acceptance": "Selection uses documented precedence and never lands on an unrelated stale folder entry.",
+      "metric": "Measure rescan work and time to stable selection.",
+      "related": [
+        "VIEW-04",
+        "LIST-05"
+      ],
+      "requires": [
+        "display"
+      ]
+    },
+    {
+      "id": "LIST-01",
+      "group": "List data and interaction",
+      "title": "Path-aware search filtering",
+      "sources": [
+        "/home/kkk/Apps/rust-feh/src/ui_logic.rs",
+        "/home/kkk/Apps/rust-feh/src/main.rs",
+        "/home/kkk/Apps/rust-feh/tests/feature_001_validation.rs",
+        "/home/kkk/Apps/rust-feh/specs/005-image-list-presentation/spec.md"
+      ],
+      "symbols": [
+        "entry_matches_search",
+        "filter_indices",
+        "compute_list_indices"
+      ],
+      "tests": [
+        "cargo test --lib filter_ -- --nocapture",
+        "cargo test --test feature_001_validation sc003_filter_10k_under_200ms -- --nocapture"
+      ],
+      "normal": [
+        "Filename and relative-folder matches",
+        "Empty query and zero matches"
+      ],
+      "adverse": [
+        "Mixed case and Unicode",
+        "Root changes with same query",
+        "Non-UTF8 filenames where supported"
+      ],
+      "cases": [
+        "Filename and relative-folder matches",
+        "Empty query and zero matches",
+        "Mixed case and Unicode",
+        "Root changes with same query",
+        "Non-UTF8 filenames where supported"
+      ],
+      "acceptance": "Returned indices match the search contract and count; stale cached matches cannot leak across roots.",
+      "metric": "Measure 1k/10k filtering separately from sorting and GUI frames.",
+      "related": [
+        "LIST-03",
+        "LIST-05"
+      ],
+      "requires": [
+        "fixture"
+      ]
+    },
+    {
+      "id": "LIST-02",
+      "group": "List data and interaction",
+      "title": "Sort order and viewer-filelist parity",
+      "sources": [
+        "/home/kkk/Apps/rust-feh/src/ui_logic.rs",
+        "/home/kkk/Apps/rust-feh/src/main.rs",
+        "/home/kkk/Apps/rust-feh/tests/feature_005_list.rs",
+        "/home/kkk/Apps/rust-feh/specs/005-image-list-presentation/spec.md"
+      ],
+      "symbols": [
+        "sort_key",
+        "list_indices",
+        "sort_mode_label",
+        "write_feh_filelist"
+      ],
+      "tests": [
+        "cargo test --lib sort_by_ -- --nocapture",
+        "cargo test --lib feh_filelist_order -- --nocapture"
+      ],
+      "normal": [
+        "Path/name/folder sorts",
+        "Viewer order matches visible filtered order"
+      ],
+      "adverse": [
+        "Identical names across folders",
+        "Ties and Unicode",
+        "Sort changed while selection persists"
+      ],
+      "cases": [
+        "Path/name/folder sorts",
+        "Viewer order matches visible filtered order",
+        "Identical names across folders",
+        "Ties and Unicode",
+        "Sort changed while selection persists"
+      ],
+      "acceptance": "Order is reproducible and each list index remains associated with its correct path.",
+      "metric": "Measure sort-key allocations and sort time with duplicates and long paths.",
+      "related": [
+        "VIEW-01",
+        "LIST-03"
+      ],
+      "requires": [
+        "fixture"
+      ]
+    },
+    {
+      "id": "LIST-03",
+      "group": "List data and interaction",
+      "title": "Memoization and mutation invalidation",
+      "sources": [
+        "/home/kkk/Apps/rust-feh/src/main.rs",
+        "/home/kkk/Apps/rust-feh/src/ui_logic.rs",
+        "/home/kkk/Apps/rust-feh/specs/017-lazy-folder-scanning/spec.md"
+      ],
+      "symbols": [
+        "compute_list_indices",
+        "ListIndexKey",
+        "TreeRowsKey",
+        "images_revision"
+      ],
+      "tests": [
+        "cargo test --test feature_005_list -- --nocapture"
+      ],
+      "normal": [
+        "Repeated unchanged frames reuse data",
+        "Search/sort/root changes invalidate"
+      ],
+      "adverse": [
+        "Rename/move/add/status changes",
+        "Revision wrapping",
+        "Cached vector clone cost"
+      ],
+      "cases": [
+        "Repeated unchanged frames reuse data",
+        "Search/sort/root changes invalidate",
+        "Rename/move/add/status changes",
+        "Revision wrapping",
+        "Cached vector clone cost"
+      ],
+      "acceptance": "Every mutation site is mapped to invalidation; cached and uncached reference results agree.",
+      "metric": "Measure cache hit/miss calls and copied bytes at 1k/10k; optimization requires measured benefit.",
+      "related": [
+        "SCAN-07",
+        "SCAN-08",
+        "BATCH-04"
+      ],
+      "requires": [
+        "fixture"
+      ]
+    },
+    {
+      "id": "LIST-04",
+      "group": "List data and interaction",
+      "title": "Tree building, expansion and inventory counts",
+      "sources": [
+        "/home/kkk/Apps/rust-feh/src/ui_logic.rs",
+        "/home/kkk/Apps/rust-feh/src/types.rs",
+        "/home/kkk/Apps/rust-feh/src/main.rs",
+        "/home/kkk/Apps/rust-feh/tests/feature_005_list.rs",
+        "/home/kkk/Apps/rust-feh/specs/005-image-list-presentation/spec.md"
+      ],
+      "symbols": [
+        "build_folder_tree",
+        "tree_visible_rows",
+        "effective_expanded_paths",
+        "ScanInventory"
+      ],
+      "tests": [
+        "cargo test --lib tree_ -- --nocapture",
+        "cargo test --lib inventory_ -- --nocapture"
+      ],
+      "normal": [
+        "Folder hierarchy and expansion",
+        "Filtered ancestors remain navigable"
+      ],
+      "adverse": [
+        "Empty/deep tree",
+        "Converted and optimized entries",
+        "Updates after move or processed-add"
+      ],
+      "cases": [
+        "Folder hierarchy and expansion",
+        "Filtered ancestors remain navigable",
+        "Empty/deep tree",
+        "Converted and optimized entries",
+        "Updates after move or processed-add"
+      ],
+      "acceptance": "Visible rows, root counts and live inventory agree under filter and mutation sequences.",
+      "metric": "Measure tree construction and flattening; verify work is not repeated every idle frame.",
+      "related": [
+        "SCAN-08",
+        "LIST-03"
+      ],
+      "requires": [
+        "fixture"
+      ]
+    },
+    {
+      "id": "LIST-05",
+      "group": "List data and interaction",
+      "title": "Selection, scrolling and row targeting",
+      "sources": [
+        "/home/kkk/Apps/rust-feh/src/main.rs",
+        "/home/kkk/Apps/rust-feh/specs/001-persistent-ui-virtual-browsing/spec.md",
+        "/home/kkk/Apps/rust-feh/specs/018-inspector-ux-rework/spec.md"
+      ],
+      "symbols": [
+        "sync_selection_to_filter",
+        "handle_image_row_click",
+        "pending_flat_scroll_offset",
+        "select_image"
+      ],
+      "tests": [
+        "cargo test --test feature_001_validation -- --nocapture"
+      ],
+      "normal": [
+        "Single click selects; explicit action opens",
+        "Sort/view toggle preserves intended selection"
+      ],
+      "adverse": [
+        "Zero-match filter",
+        "Pending scroll target not yet present",
+        "Right-click unselected row",
+        "Moved selected item"
+      ],
+      "cases": [
+        "Single click selects; explicit action opens",
+        "Sort/view toggle preserves intended selection",
+        "Zero-match filter",
+        "Pending scroll target not yet present",
+        "Right-click unselected row",
+        "Moved selected item"
+      ],
+      "acceptance": "Actions target the clicked/selected contract and pending scroll is not consumed prematurely.",
+      "metric": "Measure click-to-stage and scroll-to-target latency.",
+      "related": [
+        "NAV-03",
+        "ACT-02",
+        "STAGE-02"
+      ],
+      "requires": [
+        "display"
+      ]
+    },
+    {
+      "id": "LIST-06",
+      "group": "List data and interaction",
+      "title": "Flat/tree virtualization and long-row layout",
+      "sources": [
+        "/home/kkk/Apps/rust-feh/src/main.rs",
+        "/home/kkk/Apps/rust-feh/src/ui_logic.rs",
+        "/home/kkk/Apps/rust-feh/specs/018-inspector-ux-rework/spec.md"
+      ],
+      "symbols": [
+        "render_flat_image_list",
+        "render_tree_image_list",
+        "ImageListMetrics",
+        "sections_drawer_reserved_height"
+      ],
+      "tests": [
+        "cargo test --lib sections_drawer -- --nocapture",
+        "cargo test --test feature_005_list -- --nocapture"
+      ],
+      "normal": [
+        "10k rows scroll with bounded rendering",
+        "Long paths truncate with complete hover text"
+      ],
+      "adverse": [
+        "Drawer toggles during scroll",
+        "Very small/high-DPI window",
+        "Deep tree row-height drift"
+      ],
+      "cases": [
+        "10k rows scroll with bounded rendering",
+        "Long paths truncate with complete hover text",
+        "Drawer toggles during scroll",
+        "Very small/high-DPI window",
+        "Deep tree row-height drift"
+      ],
+      "acceptance": "Rendered rows and offsets stay consistent; accepted historical drift is measured rather than silently reopened.",
+      "metric": "Measure frame latency/row count while scrolling, resizing and expanding drawer.",
+      "related": [
+        "INSP-01",
+        "LIST-04"
+      ],
+      "requires": [
+        "display",
+        "input-control"
+      ]
+    },
+    {
+      "id": "INSP-01",
+      "group": "Inspector",
+      "title": "Inspector width and four-zone height budget",
+      "sources": [
+        "/home/kkk/Apps/rust-feh/src/main.rs",
+        "/home/kkk/Apps/rust-feh/src/ui_logic.rs",
+        "/home/kkk/Apps/rust-feh/specs/018-inspector-ux-rework/plan.md"
+      ],
+      "symbols": [
+        "inspector_width",
+        "inspector_max_width",
+        "render_inspector_panel",
+        "sections_drawer_body_height"
+      ],
+      "tests": [
+        "cargo test --lib sections_drawer -- --nocapture"
+      ],
+      "normal": [
+        "Persistent navigation/list with collapsed drawer",
+        "Expanded drawer remains bounded"
+      ],
+      "adverse": [
+        "Narrow/short viewport",
+        "DPI change",
+        "Very long dynamic labels",
+        "No subfolders"
+      ],
+      "cases": [
+        "Persistent navigation/list with collapsed drawer",
+        "Expanded drawer remains bounded",
+        "Narrow/short viewport",
+        "DPI change",
+        "Very long dynamic labels",
+        "No subfolders"
+      ],
+      "acceptance": "Height remains bounded and width reclamps on resize; no unbounded outer scrolling breaks virtualization.",
+      "metric": "Measure layout recalculation, font-measure calls and resize jitter.",
+      "related": [
+        "LIST-06",
+        "PREF-01"
+      ],
+      "requires": [
+        "display"
+      ]
+    },
+    {
+      "id": "INSP-02",
+      "group": "Inspector",
+      "title": "Drawer auto-expand state machine",
+      "sources": [
+        "/home/kkk/Apps/rust-feh/src/ui_logic.rs",
+        "/home/kkk/Apps/rust-feh/src/main.rs",
+        "/home/kkk/Apps/rust-feh/tests/unit/ui_logic.rs",
+        "/home/kkk/Apps/rust-feh/specs/018-inspector-ux-rework/spec.md"
+      ],
+      "symbols": [
+        "AutoExpandState",
+        "sync_auto_expand_folder_edge",
+        "toggle_inspector_section"
+      ],
+      "tests": [
+        "cargo test --lib auto_expand -- --nocapture",
+        "cargo test --test unit_ui_logic initial_open_sections -- --nocapture"
+      ],
+      "normal": [
+        "Rising edge opens once; falling edge retracts machine-owned sections",
+        "User-open section survives retraction"
+      ],
+      "adverse": [
+        "User closes during scan",
+        "Overlapping no-folder/scan/missing-tool triggers",
+        "Recheck while manually open"
+      ],
+      "cases": [
+        "Rising edge opens once; falling edge retracts machine-owned sections",
+        "User-open section survives retraction",
+        "User closes during scan",
+        "Overlapping no-folder/scan/missing-tool triggers",
+        "Recheck while manually open"
+      ],
+      "acceptance": "All trigger/user transitions have asserted ownership and suppression behavior; no per-frame reopening.",
+      "metric": "Count state transitions and repaints rather than assuming animation cost.",
+      "related": [
+        "CAP-01",
+        "BOOT-02"
+      ],
+      "requires": [
+        "fixture"
+      ]
+    },
+    {
+      "id": "INSP-03",
+      "group": "Inspector",
+      "title": "Section detach and reattach lifecycle",
+      "sources": [
+        "/home/kkk/Apps/rust-feh/src/main.rs",
+        "/home/kkk/Apps/rust-feh/src/ui_logic.rs",
+        "/home/kkk/Apps/rust-feh/src/types.rs",
+        "/home/kkk/Apps/rust-feh/specs/018-inspector-ux-rework/spec.md"
+      ],
+      "symbols": [
+        "render_detached_inspector_windows",
+        "detached_window_chrome",
+        "InspectorSection",
+        "DetachedWindow"
+      ],
+      "tests": [
+        "cargo test --test unit_ui_logic initial_open_sections -- --nocapture"
+      ],
+      "normal": [
+        "Each of seven sections detaches/docks",
+        "Detached body matches docked controls"
+      ],
+      "adverse": [
+        "Multiple sections open",
+        "Close detached window then reopen",
+        "Resize and changed selection"
+      ],
+      "cases": [
+        "Each of seven sections detaches/docks",
+        "Detached body matches docked controls",
+        "Multiple sections open",
+        "Close detached window then reopen",
+        "Resize and changed selection"
+      ],
+      "acceptance": "Deterministic IDs/order, no duplicate control owner, and closing does not lose unrelated section state.",
+      "metric": "Measure idle repaint and duplicate rendering with several detached sections.",
+      "related": [
+        "INSP-04",
+        "OBS-01"
+      ],
+      "requires": [
+        "display",
+        "input-control"
+      ]
+    },
+    {
+      "id": "INSP-04",
+      "group": "Inspector",
+      "title": "Pinned image context and safe action scope",
+      "sources": [
+        "/home/kkk/Apps/rust-feh/src/main.rs",
+        "/home/kkk/Apps/rust-feh/src/ui_logic.rs",
+        "/home/kkk/Apps/rust-feh/tests/unit/ui_logic.rs",
+        "/home/kkk/Apps/rust-feh/specs/018-inspector-ux-rework/spec.md"
+      ],
+      "symbols": [
+        "panel_context",
+        "render_image_actions_pin_toggle",
+        "pinned_path_in_filtered_list",
+        "open_in_feh_pinned"
+      ],
+      "tests": [
+        "cargo test --test unit_ui_logic panel_context -- --nocapture"
+      ],
+      "normal": [
+        "Pin remains on image while live selection changes",
+        "Unpin follows live selection"
+      ],
+      "adverse": [
+        "Pinned file disappears or belongs to another folder",
+        "Batch tabs while pinned",
+        "Viewer close changes live selection"
+      ],
+      "cases": [
+        "Pin remains on image while live selection changes",
+        "Unpin follows live selection",
+        "Pinned file disappears or belongs to another folder",
+        "Batch tabs while pinned",
+        "Viewer close changes live selection"
+      ],
+      "acceptance": "Every enabled action acts on documented context; folder-scoped actions cannot silently target a different folder.",
+      "metric": "Check pinned validation for per-frame filesystem work and filter membership cost.",
+      "related": [
+        "VIEW-04",
+        "ACT-01",
+        "BATCH-01"
+      ],
+      "requires": [
+        "display"
+      ]
+    },
+    {
+      "id": "STAGE-01",
+      "group": "Selected-image stage",
+      "title": "Decode, dimension bounds and aspect correctness",
+      "sources": [
+        "/home/kkk/Apps/rust-feh/src/image_proc.rs",
+        "/home/kkk/Apps/rust-feh/src/ui_logic.rs",
+        "/home/kkk/Apps/rust-feh/src/types.rs",
+        "/home/kkk/Apps/rust-feh/tests/unit/image_proc.rs",
+        "/home/kkk/Apps/rust-feh/specs/016-feh-viewer-actions/spec.md"
+      ],
+      "symbols": [
+        "decode_stage_rgba",
+        "stage_decode_bounds",
+        "StagedImage"
+      ],
+      "tests": [
+        "cargo test --lib decode_stage_rgba -- --nocapture",
+        "cargo test --lib stage_decode_bounds -- --nocapture"
+      ],
+      "normal": [
+        "Landscape/portrait/small images fit within bounds",
+        "Real JPEG/PNG/WebP images decode"
+      ],
+      "adverse": [
+        "Zero/huge dimensions",
+        "Corrupt/missing source",
+        "Exotic format without decoder"
+      ],
+      "cases": [
+        "Landscape/portrait/small images fit within bounds",
+        "Real JPEG/PNG/WebP images decode",
+        "Zero/huge dimensions",
+        "Corrupt/missing source",
+        "Exotic format without decoder"
+      ],
+      "acceptance": "Returned dimensions/buffer size/aspect are valid and unsupported input is explicit; uncommitted aspect_ratio helper is not assumed in baseline.",
+      "metric": "Measure decode wall time and peak allocation with real images, not fake JPEG names.",
+      "related": [
+        "STAGE-02",
+        "IMAGE-01"
+      ],
+      "requires": [
+        "fixture"
+      ]
+    },
+    {
+      "id": "STAGE-02",
+      "group": "Selected-image stage",
+      "title": "Decode supersession and texture lifecycle",
+      "sources": [
+        "/home/kkk/Apps/rust-feh/src/main.rs",
+        "/home/kkk/Apps/rust-feh/src/types.rs",
+        "/home/kkk/Apps/rust-feh/specs/016-feh-viewer-actions/spec.md"
+      ],
+      "symbols": [
+        "kick_stage_decode_if_selection_changed",
+        "poll_stage_decode",
+        "StageDecodeMsg",
+        "render_stage_image"
+      ],
+      "tests": [
+        "cargo test --lib decode_stage_rgba -- --nocapture"
+      ],
+      "normal": [
+        "Selected image appears after decode",
+        "Unchanged selection avoids repeated decode"
+      ],
+      "adverse": [
+        "Rapid A-B-A selection with reordered completion",
+        "Error after newer success",
+        "Folder change or moved file during decode"
+      ],
+      "cases": [
+        "Selected image appears after decode",
+        "Unchanged selection avoids repeated decode",
+        "Rapid A-B-A selection with reordered completion",
+        "Error after newer success",
+        "Folder change or moved file during decode"
+      ],
+      "acceptance": "Old completions cannot replace current stage; textures and worker state have bounded lifetime.",
+      "metric": "Measure input-to-visible-image latency and retained texture/memory across repeated selection.",
+      "related": [
+        "LIST-05",
+        "LIFE-01"
+      ],
+      "requires": [
+        "display"
+      ]
+    },
+    {
+      "id": "STAGE-03",
+      "group": "Selected-image stage",
+      "title": "Stage empty/error state and action gating",
+      "sources": [
+        "/home/kkk/Apps/rust-feh/src/main.rs",
+        "/home/kkk/Apps/rust-feh/src/ui_logic.rs",
+        "/home/kkk/Apps/rust-feh/specs/016-feh-viewer-actions/spec.md"
+      ],
+      "symbols": [
+        "render_stage_pane",
+        "render_stage_status_line",
+        "render_image_context_menu",
+        "file_status_decodable"
+      ],
+      "tests": [
+        "cargo test --lib file_status_decodable -- --nocapture"
+      ],
+      "normal": [
+        "No selection shows intentional empty state",
+        "Stage remains image-only with status outside image"
+      ],
+      "adverse": [
+        "Undecodable or deleted file",
+        "Context menu during pending decode",
+        "Unsupported processing action"
+      ],
+      "cases": [
+        "No selection shows intentional empty state",
+        "Stage remains image-only with status outside image",
+        "Undecodable or deleted file",
+        "Context menu during pending decode",
+        "Unsupported processing action"
+      ],
+      "acceptance": "Status and action availability agree with actual selection/decodability without stale-image actions.",
+      "metric": "Measure idle repaints and repeated error/decode retries.",
+      "related": [
+        "ACT-04",
+        "OBS-01"
+      ],
+      "requires": [
+        "display",
+        "input-control"
+      ]
+    },
+    {
+      "id": "VIEW-01",
+      "group": "Viewer integration",
+      "title": "Filelist, spawn arguments and isolated profile",
+      "sources": [
+        "/home/kkk/Apps/rust-feh/src/ui_logic.rs",
+        "/home/kkk/Apps/rust-feh/src/main.rs",
+        "/home/kkk/Apps/rust-feh/tests/integration/feature_016_roundtrip.rs",
+        "/home/kkk/Apps/rust-feh/specs/011-browsing-experience-round/spec.md",
+        "/home/kkk/Apps/rust-feh/specs/016-feh-viewer-actions/spec.md"
+      ],
+      "symbols": [
+        "viewer_spawn_command",
+        "write_feh_filelist",
+        "open_in_feh",
+        "viewer_profile_dir"
+      ],
+      "tests": [
+        "cargo test --lib viewer_spawn_command -- --nocapture",
+        "cargo test --lib write_feh_filelist -- --nocapture"
+      ],
+      "normal": [
+        "Filtered sorted list starts at selected path",
+        "Geometry and viewer-profile isolation"
+      ],
+      "adverse": [
+        "Spaces/quotes/Unicode/newline-like path boundaries",
+        "Empty list",
+        "Spawn permission failure"
+      ],
+      "cases": [
+        "Filtered sorted list starts at selected path",
+        "Geometry and viewer-profile isolation",
+        "Spaces/quotes/Unicode/newline-like path boundaries",
+        "Empty list",
+        "Spawn permission failure"
+      ],
+      "acceptance": "Argument vector and handoff quoting are safe, list encoding limitations explicit, and personal feh profile unchanged.",
+      "metric": "Measure filelist creation and launch-to-first-image separately.",
+      "related": [
+        "LIST-02",
+        "CAP-01"
+      ],
+      "requires": [
+        "feh",
+        "display",
+        "isolated-home"
+      ]
+    },
+    {
+      "id": "VIEW-02",
+      "group": "Viewer integration",
+      "title": "Launch entries, folders and multiple viewers",
+      "sources": [
+        "/home/kkk/Apps/rust-feh/src/main.rs",
+        "/home/kkk/Apps/rust-feh/src/ui_logic.rs",
+        "/home/kkk/Apps/rust-feh/tests/unit/ui_logic.rs",
+        "/home/kkk/Apps/rust-feh/tests/integration/feature_014_folders.rs",
+        "/home/kkk/Apps/rust-feh/specs/014-multi-feh-clipboard/spec.md"
+      ],
+      "symbols": [
+        "build_entry_filelist",
+        "entry_is_launchable",
+        "launch_entry_feh",
+        "launch_all_entries"
+      ],
+      "tests": [
+        "cargo test --test unit_ui_logic test_entry -- --nocapture",
+        "cargo test --test feature_014_folders -- --list"
+      ],
+      "normal": [
+        "Entry launches its own assigned folder",
+        "Launch all handles several entries independently"
+      ],
+      "adverse": [
+        "Unassigned/missing/empty folder",
+        "Entry folder differs from current browse folder",
+        "Tool disappears before launch"
+      ],
+      "cases": [
+        "Entry launches its own assigned folder",
+        "Launch all handles several entries independently",
+        "Unassigned/missing/empty folder",
+        "Entry folder differs from current browse folder",
+        "Tool disappears before launch"
+      ],
+      "acceptance": "No dependence on current flat list; per-entry success/failure is accurate and does not suppress other entries.",
+      "metric": "Count per-frame folder stats and launch-time scans; count-cache deferral is not new-feature authorization.",
+      "related": [
+        "PREF-02",
+        "CAP-01"
+      ],
+      "requires": [
+        "feh",
+        "display",
+        "fixture-folders"
+      ]
+    },
+    {
+      "id": "VIEW-03",
+      "group": "Viewer integration",
+      "title": "Handoff validation and deleted-image fallback",
+      "sources": [
+        "/home/kkk/Apps/rust-feh/src/ui_logic.rs",
+        "/home/kkk/Apps/rust-feh/tests/integration/feature_016_roundtrip.rs",
+        "/home/kkk/Apps/rust-feh/specs/016-feh-viewer-actions/spec.md"
+      ],
+      "symbols": [
+        "validate_handoff",
+        "matching_filelist_index",
+        "nearest_surviving_neighbor",
+        "handoff_path"
+      ],
+      "tests": [
+        "cargo test --lib validate_handoff -- --nocapture",
+        "cargo test --test feature_016_roundtrip -- --nocapture"
+      ],
+      "normal": [
+        "Exact trusted filelist image resolves",
+        "Unchanged handoff preserves selection"
+      ],
+      "adverse": [
+        "Tampered/empty/garbage content",
+        "Symlink escape",
+        "Landed file deleted",
+        "Distinct viewers have distinct files"
+      ],
+      "cases": [
+        "Exact trusted filelist image resolves",
+        "Unchanged handoff preserves selection",
+        "Tampered/empty/garbage content",
+        "Symlink escape",
+        "Landed file deleted",
+        "Distinct viewers have distinct files"
+      ],
+      "acceptance": "Only trusted surviving entries are accepted; rejected content cannot cause arbitrary file operations.",
+      "metric": "Measure validation work with large filelists and expensive canonicalization.",
+      "related": [
+        "VIEW-04",
+        "VIEW-05"
+      ],
+      "requires": [
+        "isolated-home"
+      ]
+    },
+    {
+      "id": "VIEW-04",
+      "group": "Viewer integration",
+      "title": "Return selection, cross-folder landing and exit order",
+      "sources": [
+        "/home/kkk/Apps/rust-feh/src/main.rs",
+        "/home/kkk/Apps/rust-feh/specs/016-feh-viewer-actions/spec.md",
+        "/home/kkk/Apps/rust-feh/specs/017-lazy-folder-scanning/spec.md"
+      ],
+      "symbols": [
+        "poll_round_trip_viewers",
+        "handle_round_trip_exit",
+        "stage_selection_from_round_trip"
+      ],
+      "tests": [
+        "cargo test --test feature_016_roundtrip -- --nocapture"
+      ],
+      "normal": [
+        "Navigate in viewer then close and stage landed image",
+        "Cross-folder return navigates before selecting"
+      ],
+      "adverse": [
+        "Return during rescan",
+        "Two viewers exit in reversed order",
+        "Pinned context vs live selection",
+        "Landed file deleted"
+      ],
+      "cases": [
+        "Navigate in viewer then close and stage landed image",
+        "Cross-folder return navigates before selecting",
+        "Return during rescan",
+        "Two viewers exit in reversed order",
+        "Pinned context vs live selection",
+        "Landed file deleted"
+      ],
+      "acceptance": "Exact GUI landing/scroll/stage behavior is demonstrated, not inferred from protocol-only tests.",
+      "metric": "Measure close-to-correct-stage latency and redundant rescans.",
+      "related": [
+        "NAV-03",
+        "LIST-05",
+        "INSP-04"
+      ],
+      "requires": [
+        "feh",
+        "display",
+        "input-control"
+      ]
+    },
+    {
+      "id": "VIEW-05",
+      "group": "Viewer integration",
+      "title": "Viewer child ownership and handoff cleanup",
+      "sources": [
+        "/home/kkk/Apps/rust-feh/src/main.rs",
+        "/home/kkk/Apps/rust-feh/src/ui_logic.rs",
+        "/home/kkk/Apps/rust-feh/tests/integration/feature_016_roundtrip.rs",
+        "/home/kkk/Apps/rust-feh/specs/016-feh-viewer-actions/spec.md"
+      ],
+      "symbols": [
+        "spawn_round_trip_viewer",
+        "poll_round_trip_viewers",
+        "cleanup_stale_handoffs",
+        "ViewerRoundTrip"
+      ],
+      "tests": [
+        "cargo test --lib cleanup_stale_handoffs -- --nocapture",
+        "cargo test --test feature_016_roundtrip handoff_path -- --nocapture"
+      ],
+      "normal": [
+        "Normal viewer exit cleans its handoff",
+        "Independent viewers remain isolated"
+      ],
+      "adverse": [
+        "Abnormal child exit",
+        "App restart with stale handoff",
+        "Concurrent app processes",
+        "PID/name collision"
+      ],
+      "cases": [
+        "Normal viewer exit cleans its handoff",
+        "Independent viewers remain isolated",
+        "Abnormal child exit",
+        "App restart with stale handoff",
+        "Concurrent app processes",
+        "PID/name collision"
+      ],
+      "acceptance": "Cleanup does not remove a live peer session or unrelated file; child exit is observed without blocking UI.",
+      "metric": "Measure poll cost and stale-file accumulation over repeated viewer sessions.",
+      "related": [
+        "LIFE-01",
+        "CACHE-05"
+      ],
+      "requires": [
+        "feh",
+        "isolated-home"
+      ]
+    },
+    {
+      "id": "ACT-01",
+      "group": "File actions and clipboard",
+      "title": "Save-copy destination and collision safety",
+      "sources": [
+        "/home/kkk/Apps/rust-feh/src/ui_logic.rs",
+        "/home/kkk/Apps/rust-feh/src/main.rs",
+        "/home/kkk/Apps/rust-feh/tests/integration/feature_016_actions.rs",
+        "/home/kkk/Apps/rust-feh/specs/016-feh-viewer-actions/spec.md"
+      ],
+      "symbols": [
+        "save_copy_to",
+        "collision_suffixed_path",
+        "action_save_copy"
+      ],
+      "tests": [
+        "cargo test --lib save_copy_to -- --nocapture",
+        "cargo test --lib collision_suffixed_path -- --nocapture"
+      ],
+      "normal": [
+        "Copy into new destination",
+        "Existing filename selects safe alternate"
+      ],
+      "adverse": [
+        "Read-only destination",
+        "Source equals destination",
+        "Symlink destination or concurrent collision",
+        "Unicode/dotfiles"
+      ],
+      "cases": [
+        "Copy into new destination",
+        "Existing filename selects safe alternate",
+        "Read-only destination",
+        "Source equals destination",
+        "Symlink destination or concurrent collision",
+        "Unicode/dotfiles"
+      ],
+      "acceptance": "Original bytes remain unchanged; existing unrelated destinations are not clobbered; failure leaves a defined state.",
+      "metric": "Measure copy overhead without treating safety checks as optional.",
+      "related": [
+        "PREF-03",
+        "ACT-03"
+      ],
+      "requires": [
+        "fixture"
+      ]
+    },
+    {
+      "id": "ACT-02",
+      "group": "File actions and clipboard",
+      "title": "Loss-proof moves and post-move selection",
+      "sources": [
+        "/home/kkk/Apps/rust-feh/src/ui_logic.rs",
+        "/home/kkk/Apps/rust-feh/src/main.rs",
+        "/home/kkk/Apps/rust-feh/tests/integration/feature_016_actions.rs",
+        "/home/kkk/Apps/rust-feh/specs/016-feh-viewer-actions/spec.md"
+      ],
+      "symbols": [
+        "plan_loss_proof_move",
+        "execute_move_plan",
+        "action_move_to",
+        "advance_stage_after_move"
+      ],
+      "tests": [
+        "cargo test --lib loss_proof_move -- --nocapture",
+        "cargo test --test feature_016_actions -- --nocapture"
+      ],
+      "normal": [
+        "Same-filesystem move",
+        "Selected versus unselected source move updates correct row"
+      ],
+      "adverse": [
+        "Cross-filesystem fallback",
+        "Copy verification or deletion fails",
+        "Destination race",
+        "User move while converted refresh arrives"
+      ],
+      "cases": [
+        "Same-filesystem move",
+        "Selected versus unselected source move updates correct row",
+        "Cross-filesystem fallback",
+        "Copy verification or deletion fails",
+        "Destination race",
+        "User move while converted refresh arrives"
+      ],
+      "acceptance": "Source is removed only after verified success; partial outcomes are explicit; unrelated selection is not hijacked.",
+      "metric": "Measure filesystem branches separately; do not optimize away preservation checks.",
+      "related": [
+        "SCAN-08",
+        "LIST-05",
+        "ACT-03"
+      ],
+      "requires": [
+        "fixture",
+        "cross-filesystem-optional"
+      ]
+    },
+    {
+      "id": "ACT-03",
+      "group": "File actions and clipboard",
+      "title": "Output policies, backups and write boundaries",
+      "sources": [
+        "/home/kkk/Apps/rust-feh/src/image_proc.rs",
+        "/home/kkk/Apps/rust-feh/src/ui_logic.rs",
+        "/home/kkk/Apps/rust-feh/src/types.rs",
+        "/home/kkk/Apps/rust-feh/tests/unit/ui_logic.rs",
+        "/home/kkk/Apps/rust-feh/specs/013-image-tools-magick-cache/spec.md"
+      ],
+      "symbols": [
+        "compute_output_path",
+        "create_backup",
+        "policy_requires_backup",
+        "OutputPolicy"
+      ],
+      "tests": [
+        "cargo test --test unit_ui_logic compute_output_path -- --nocapture",
+        "cargo test --test integration_image_tools sc005 -- --nocapture"
+      ],
+      "normal": [
+        "Subfolder/suffix outputs preserve originals",
+        "In-place mode creates promised backup"
+      ],
+      "adverse": [
+        "Existing backup",
+        "Traversal/absolute output components",
+        "Disk-full or interrupted write",
+        "Cache-hit bypass path"
+      ],
+      "cases": [
+        "Subfolder/suffix outputs preserve originals",
+        "In-place mode creates promised backup",
+        "Existing backup",
+        "Traversal/absolute output components",
+        "Disk-full or interrupted write",
+        "Cache-hit bypass path"
+      ],
+      "acceptance": "Each policy has explicit overwrite/backup/partial-write semantics and cannot silently violate original preservation.",
+      "metric": "Measure backup/write overhead separately from transforms; safety behavior is invariant.",
+      "related": [
+        "CACHE-03",
+        "IMAGE-03"
+      ],
+      "requires": [
+        "fixture"
+      ]
+    },
+    {
+      "id": "ACT-04",
+      "group": "File actions and clipboard",
+      "title": "Context-menu action dispatch and outcomes",
+      "sources": [
+        "/home/kkk/Apps/rust-feh/src/main.rs",
+        "/home/kkk/Apps/rust-feh/src/ui_logic.rs",
+        "/home/kkk/Apps/rust-feh/specs/016-feh-viewer-actions/spec.md",
+        "/home/kkk/Apps/rust-feh/specs/018-inspector-ux-rework/spec.md"
+      ],
+      "symbols": [
+        "render_image_context_menu",
+        "run_derived_action",
+        "record_action_outcome",
+        "format_action_outcome"
+      ],
+      "tests": [
+        "cargo test --lib format_action_outcome -- --nocapture",
+        "cargo test --lib file_status_decodable -- --nocapture"
+      ],
+      "normal": [
+        "Stage/flat/tree context menus dispatch same behavior",
+        "Cancel is not success or failure"
+      ],
+      "adverse": [
+        "Right-click non-selected image",
+        "Operation fails after source changes",
+        "Pinned image context"
+      ],
+      "cases": [
+        "Stage/flat/tree context menus dispatch same behavior",
+        "Cancel is not success or failure",
+        "Right-click non-selected image",
+        "Operation fails after source changes",
+        "Pinned image context"
+      ],
+      "acceptance": "Target, produced path, error and inventory effects are consistent across every action entry point.",
+      "metric": "Measure synchronous action blocking and outcome-to-visible-state delay.",
+      "related": [
+        "INSP-04",
+        "OBS-01"
+      ],
+      "requires": [
+        "display",
+        "input-control"
+      ]
+    },
+    {
+      "id": "CLIP-01",
+      "group": "File actions and clipboard",
+      "title": "Copy path, pixels and clipboard availability",
+      "sources": [
+        "/home/kkk/Apps/rust-feh/src/ui_logic.rs",
+        "/home/kkk/Apps/rust-feh/src/main.rs",
+        "/home/kkk/Apps/rust-feh/tests/integration/clipboard_copy.rs",
+        "/home/kkk/Apps/rust-feh/specs/014-multi-feh-clipboard/spec.md"
+      ],
+      "symbols": [
+        "copy_image_to_clipboard",
+        "decode_image_to_rgba",
+        "action_copy_image"
+      ],
+      "tests": [
+        "cargo test --test unit_ui_logic test_clipboard -- --nocapture",
+        "cargo test --test integration_clipboard_copy -- --list"
+      ],
+      "normal": [
+        "Copied path is exact",
+        "RGBA bytes/dimensions round-trip through isolated clipboard"
+      ],
+      "adverse": [
+        "No backend/readback",
+        "Missing/corrupt/large image",
+        "Clipboard owner lifetime after function return"
+      ],
+      "cases": [
+        "Copied path is exact",
+        "RGBA bytes/dimensions round-trip through isolated clipboard",
+        "No backend/readback",
+        "Missing/corrupt/large image",
+        "Clipboard owner lifetime after function return"
+      ],
+      "acceptance": "Report actual execution separately from skip; no personal clipboard contents are overwritten during review.",
+      "metric": "Measure decode/clipboard blocking and peak memory with representative real images.",
+      "related": [
+        "STAGE-01",
+        "OBS-02"
+      ],
+      "requires": [
+        "isolated-clipboard",
+        "display"
+      ]
+    },
+    {
+      "id": "IMAGE-01",
+      "group": "Image transformations",
+      "title": "Resize dimensions, fit and filter semantics",
+      "sources": [
+        "/home/kkk/Apps/rust-feh/src/image_proc.rs",
+        "/home/kkk/Apps/rust-feh/src/main.rs",
+        "/home/kkk/Apps/rust-feh/src/types.rs",
+        "/home/kkk/Apps/rust-feh/tests/unit/image_proc.rs",
+        "/home/kkk/Apps/rust-feh/specs/013-image-tools-magick-cache/spec.md"
+      ],
+      "symbols": [
+        "process_image",
+        "process_image_crate",
+        "tools_build_resize_op",
+        "Filter",
+        "FitMode"
+      ],
+      "tests": [
+        "cargo test --test unit_image_proc -- --nocapture",
+        "cargo test --test integration_image_tools single_resize -- --nocapture"
+      ],
+      "normal": [
+        "Width/height/percentage controls",
+        "Fit and filter selection match output geometry"
+      ],
+      "adverse": [
+        "Zero/negative/nonfinite input",
+        "Extreme aspect or dimensions",
+        "External versus native route"
+      ],
+      "cases": [
+        "Width/height/percentage controls",
+        "Fit and filter selection match output geometry",
+        "Zero/negative/nonfinite input",
+        "Extreme aspect or dimensions",
+        "External versus native route"
+      ],
+      "acceptance": "Decoded output dimensions and aspect match chosen semantics; invalid input cannot produce destructive output.",
+      "metric": "Measure decode/resize/encode phases and memory with identical images and build mode.",
+      "related": [
+        "ACT-03",
+        "IMAGE-03"
+      ],
+      "requires": [
+        "fixture"
+      ]
+    },
+    {
+      "id": "IMAGE-02",
+      "group": "Image transformations",
+      "title": "Crop parsing, clamping and preview parity",
+      "sources": [
+        "/home/kkk/Apps/rust-feh/src/image_proc.rs",
+        "/home/kkk/Apps/rust-feh/src/ui_logic.rs",
+        "/home/kkk/Apps/rust-feh/src/main.rs",
+        "/home/kkk/Apps/rust-feh/tests/unit/image_proc.rs",
+        "/home/kkk/Apps/rust-feh/tests/unit/ui_logic.rs",
+        "/home/kkk/Apps/rust-feh/specs/013-image-tools-magick-cache/spec.md"
+      ],
+      "symbols": [
+        "parse_crop_geometry",
+        "clamp_crop",
+        "crop_image",
+        "crop_preview_pixels",
+        "render_tools_crop_preview"
+      ],
+      "tests": [
+        "cargo test --test unit_image_proc parse_crop -- --nocapture",
+        "cargo test --test unit_ui_logic crop_preview -- --nocapture"
+      ],
+      "normal": [
+        "Valid positive geometry",
+        "Preview pixels and saved crop agree"
+      ],
+      "adverse": [
+        "Negative offsets",
+        "Out-of-bounds/zero/overflow geometry",
+        "Selection changes while preview cached"
+      ],
+      "cases": [
+        "Valid positive geometry",
+        "Preview pixels and saved crop agree",
+        "Negative offsets",
+        "Out-of-bounds/zero/overflow geometry",
+        "Selection changes while preview cached"
+      ],
+      "acceptance": "Parsing and preview use the same coordinate semantics; invalid crops preserve original and show reason.",
+      "metric": "Measure preview regeneration frequency and crop latency.",
+      "related": [
+        "STAGE-02",
+        "ACT-03"
+      ],
+      "requires": [
+        "fixture"
+      ]
+    },
+    {
+      "id": "IMAGE-03",
+      "group": "Image transformations",
+      "title": "Encoding, conversion and external fallback",
+      "sources": [
+        "/home/kkk/Apps/rust-feh/src/image_proc.rs",
+        "/home/kkk/Apps/rust-feh/src/tool_caps.rs",
+        "/home/kkk/Apps/rust-feh/tests/integration/image_tools.rs",
+        "/home/kkk/Apps/rust-feh/specs/013-image-tools-magick-cache/spec.md"
+      ],
+      "symbols": [
+        "write_image",
+        "execute_op_to_path",
+        "run_magick_resize_convert",
+        "run_magick_crop"
+      ],
+      "tests": [
+        "cargo test --test integration_image_tools -- --list",
+        "cargo test --test unit_image_proc -- --nocapture"
+      ],
+      "normal": [
+        "Supported output formats decode correctly",
+        "Quality/filter choices reach intended backend"
+      ],
+      "adverse": [
+        "Alpha-to-JPEG",
+        "Missing or failing magick",
+        "Extension differs from encoded format",
+        "Unsupported requested format"
+      ],
+      "cases": [
+        "Supported output formats decode correctly",
+        "Quality/filter choices reach intended backend",
+        "Alpha-to-JPEG",
+        "Missing or failing magick",
+        "Extension differs from encoded format",
+        "Unsupported requested format"
+      ],
+      "acceptance": "Output bytes, format, dimensions and reported destination agree; backend failure is explicit and preserves input.",
+      "metric": "Measure each backend separately and report optional-tool coverage honestly.",
+      "related": [
+        "CAP-02",
+        "ACT-03",
+        "CACHE-02"
+      ],
+      "requires": [
+        "magick",
+        "fake-executable"
+      ]
+    },
+    {
+      "id": "BATCH-01",
+      "group": "Batch and rename",
+      "title": "Batch target snapshot, progress and cancellation",
+      "sources": [
+        "/home/kkk/Apps/rust-feh/src/main.rs",
+        "/home/kkk/Apps/rust-feh/src/image_proc.rs",
+        "/home/kkk/Apps/rust-feh/specs/013-image-tools-magick-cache/spec.md"
+      ],
+      "symbols": [
+        "tools_batch_paths",
+        "tools_start_batch_job",
+        "cancel_tools_job",
+        "poll_batch_job_rx",
+        "process_batch"
+      ],
+      "tests": [
+        "cargo test --test integration_image_tools batch_mixed_success_and_failure -- --nocapture"
+      ],
+      "normal": [
+        "Batch uses documented filtered target set",
+        "Progress accounts for every input"
+      ],
+      "adverse": [
+        "Filter/folder changes after start",
+        "Cancel mid-item",
+        "Mixed failures and missing sources",
+        "Pinned context"
+      ],
+      "cases": [
+        "Batch uses documented filtered target set",
+        "Progress accounts for every input",
+        "Filter/folder changes after start",
+        "Cancel mid-item",
+        "Mixed failures and missing sources",
+        "Pinned context"
+      ],
+      "acceptance": "Input snapshot is explicit; cancellation and summary account for completed/failed/skipped work without corrupting outputs.",
+      "metric": "Measure progress cadence, cancellation latency and UI blocking.",
+      "related": [
+        "INSP-04",
+        "BATCH-04"
+      ],
+      "requires": [
+        "fixture",
+        "display"
+      ]
+    },
+    {
+      "id": "BATCH-02",
+      "group": "Batch and rename",
+      "title": "Rename token expansion and collision preview",
+      "sources": [
+        "/home/kkk/Apps/rust-feh/src/ui_logic.rs",
+        "/home/kkk/Apps/rust-feh/src/main.rs",
+        "/home/kkk/Apps/rust-feh/tests/unit/ui_logic.rs",
+        "/home/kkk/Apps/rust-feh/specs/013-image-tools-magick-cache/spec.md"
+      ],
+      "symbols": [
+        "expand_rename_pattern",
+        "expand_one_rename_token",
+        "replace_counter",
+        "tools_refresh_rename_preview"
+      ],
+      "tests": [
+        "cargo test --test unit_ui_logic expand_rename -- --nocapture",
+        "cargo test --test perf_sc_timing sc007 -- --nocapture"
+      ],
+      "normal": [
+        "Original/ext/counter/date tokens",
+        "Deterministic input order and counter padding"
+      ],
+      "adverse": [
+        "Duplicate target names",
+        "Existing file collision",
+        "Traversal or malformed token",
+        "Counter boundary/date rollover"
+      ],
+      "cases": [
+        "Original/ext/counter/date tokens",
+        "Deterministic input order and counter padding",
+        "Duplicate target names",
+        "Existing file collision",
+        "Traversal or malformed token",
+        "Counter boundary/date rollover"
+      ],
+      "acceptance": "Preview rejects invalid/colliding plans before writes and matches exact eventual target names.",
+      "metric": "Measure preview for 500 and larger lists without a per-frame filesystem scan.",
+      "related": [
+        "BATCH-03"
+      ],
+      "requires": [
+        "fixture"
+      ]
+    },
+    {
+      "id": "BATCH-03",
+      "group": "Batch and rename",
+      "title": "Rename execution and rollback safety",
+      "sources": [
+        "/home/kkk/Apps/rust-feh/src/ui_logic.rs",
+        "/home/kkk/Apps/rust-feh/src/main.rs",
+        "/home/kkk/Apps/rust-feh/tests/integration/image_tools.rs",
+        "/home/kkk/Apps/rust-feh/specs/013-image-tools-magick-cache/spec.md"
+      ],
+      "symbols": [
+        "apply_rename_pairs",
+        "tools_apply_rename",
+        "RenameApplyOutcome"
+      ],
+      "tests": [
+        "cargo test --test integration_image_tools rename_apply_rolls_back -- --nocapture"
+      ],
+      "normal": [
+        "Successful multi-file rename",
+        "Inventory names update after success"
+      ],
+      "adverse": [
+        "Failure partway through plan",
+        "Rollback itself fails",
+        "Name swap/cycle",
+        "Target appears after preview"
+      ],
+      "cases": [
+        "Successful multi-file rename",
+        "Inventory names update after success",
+        "Failure partway through plan",
+        "Rollback itself fails",
+        "Name swap/cycle",
+        "Target appears after preview"
+      ],
+      "acceptance": "No unrelated file loss; partial and rollback outcomes identify exact remaining filesystem state.",
+      "metric": "Measure rename/rollback work separately; collision prevention must remain intact.",
+      "related": [
+        "BATCH-02",
+        "BATCH-04"
+      ],
+      "requires": [
+        "fixture"
+      ]
+    },
+    {
+      "id": "BATCH-04",
+      "group": "Batch and rename",
+      "title": "Processed assets, summaries and inventory integration",
+      "sources": [
+        "/home/kkk/Apps/rust-feh/src/ui_logic.rs",
+        "/home/kkk/Apps/rust-feh/src/main.rs",
+        "/home/kkk/Apps/rust-feh/src/types.rs",
+        "/home/kkk/Apps/rust-feh/tests/unit/ui_logic.rs",
+        "/home/kkk/Apps/rust-feh/specs/013-image-tools-magick-cache/spec.md"
+      ],
+      "symbols": [
+        "add_or_update_asset_in_inventory",
+        "refresh_entry_and_inventory",
+        "aggregate_batch_results",
+        "tools_on_processed"
+      ],
+      "tests": [
+        "cargo test --test unit_ui_logic aggregate_batch_results_counts -- --nocapture",
+        "cargo test --test unit_ui_logic inventory_add_processed -- --nocapture"
+      ],
+      "normal": [
+        "New outputs appear once",
+        "Summary matches actual successes/failures"
+      ],
+      "adverse": [
+        "Existing output path reused",
+        "Folder changed during job",
+        "Converted snapshot arrives late",
+        "Cancellation leaves partial assets"
+      ],
+      "cases": [
+        "New outputs appear once",
+        "Summary matches actual successes/failures",
+        "Existing output path reused",
+        "Folder changed during job",
+        "Converted snapshot arrives late",
+        "Cancellation leaves partial assets"
+      ],
+      "acceptance": "List, inventory, status and cache invalidation describe actual produced assets without duplication or lost user changes.",
+      "metric": "Measure per-output versus batch refresh costs and redundant rebuilds.",
+      "related": [
+        "SCAN-08",
+        "LIST-03",
+        "CACHE-05"
+      ],
+      "requires": [
+        "fixture"
+      ]
+    },
+    {
+      "id": "CACHE-01",
+      "group": "Cache and prepared viewing",
+      "title": "Cache readiness, configuration and disabled mode",
+      "sources": [
+        "/home/kkk/Apps/rust-feh/src/image_proc.rs",
+        "/home/kkk/Apps/rust-feh/src/main.rs",
+        "/home/kkk/Apps/rust-feh/src/types.rs",
+        "/home/kkk/Apps/rust-feh/tests/unit/image_proc.rs",
+        "/home/kkk/Apps/rust-feh/docs/MAGICK-CACHE-SETUP.md"
+      ],
+      "symbols": [
+        "cache_ready",
+        "cache_probe",
+        "cache_root_path",
+        "update_cache",
+        "render_tools_cache_config"
+      ],
+      "tests": [
+        "cargo test --test unit_image_proc -- --nocapture",
+        "cargo test --test integration_image_tools cache_repeat -- --list"
+      ],
+      "normal": [
+        "Disabled mode avoids cache subprocesses",
+        "Valid isolated cache config becomes ready"
+      ],
+      "adverse": [
+        "Missing binary/passkey/root",
+        "Unwritable root",
+        "Readiness changes during operation"
+      ],
+      "cases": [
+        "Disabled mode avoids cache subprocesses",
+        "Valid isolated cache config becomes ready",
+        "Missing binary/passkey/root",
+        "Unwritable root",
+        "Readiness changes during operation"
+      ],
+      "acceptance": "Cache remains optional; readiness errors do not disable native tools or expose secrets.",
+      "metric": "Measure readiness probe frequency and avoid expensive checks on each frame.",
+      "related": [
+        "CAP-01",
+        "CACHE-02"
+      ],
+      "requires": [
+        "isolated-cache",
+        "magick-cache"
+      ]
+    },
+    {
+      "id": "CACHE-02",
+      "group": "Cache and prepared viewing",
+      "title": "Cache identity, freshness and hit/miss correctness",
+      "sources": [
+        "/home/kkk/Apps/rust-feh/src/image_proc.rs",
+        "/home/kkk/Apps/rust-feh/tests/unit/image_proc.rs",
+        "/home/kkk/Apps/rust-feh/tests/integration/image_tools.rs",
+        "/home/kkk/Apps/rust-feh/specs/013-image-tools-magick-cache/spec.md"
+      ],
+      "symbols": [
+        "make_iri",
+        "op_params_key",
+        "process_single",
+        "cache_put",
+        "cache_get"
+      ],
+      "tests": [
+        "cargo test --test unit_image_proc -- --nocapture",
+        "cargo test --test integration_image_tools cache_repeat -- --list"
+      ],
+      "normal": [
+        "Same source/parameters may hit",
+        "Changed operation parameters must not share result"
+      ],
+      "adverse": [
+        "Source bytes replaced at same path",
+        "Path normalization/collision",
+        "Corrupt cached output",
+        "TTL expiry"
+      ],
+      "cases": [
+        "Same source/parameters may hit",
+        "Changed operation parameters must not share result",
+        "Source bytes replaced at same path",
+        "Path normalization/collision",
+        "Corrupt cached output",
+        "TTL expiry"
+      ],
+      "acceptance": "A hit returns output equivalent to fresh processing of the intended source and parameters; actual hit is asserted.",
+      "metric": "Compare cold/warm runs with asserted hits and identical output validation, not only elapsed time.",
+      "related": [
+        "IMAGE-03",
+        "CACHE-03"
+      ],
+      "requires": [
+        "isolated-cache",
+        "magick-cache"
+      ]
+    },
+    {
+      "id": "CACHE-03",
+      "group": "Cache and prepared viewing",
+      "title": "Cache-hit output policy and backup preservation",
+      "sources": [
+        "/home/kkk/Apps/rust-feh/src/image_proc.rs",
+        "/home/kkk/Apps/rust-feh/src/ui_logic.rs",
+        "/home/kkk/Apps/rust-feh/specs/013-image-tools-magick-cache/spec.md"
+      ],
+      "symbols": [
+        "process_single",
+        "create_backup",
+        "compute_output_path"
+      ],
+      "tests": [
+        "cargo test --test integration_image_tools sc005 -- --nocapture",
+        "cargo test --test integration_image_tools cache_repeat -- --list"
+      ],
+      "normal": [
+        "Cache hit under safe new-file policy",
+        "Cache miss under in-place-with-backup policy"
+      ],
+      "adverse": [
+        "Cache hit with in-place policy returns before backup branch",
+        "Cache export fails partway",
+        "Existing backup"
+      ],
+      "cases": [
+        "Cache hit under safe new-file policy",
+        "Cache miss under in-place-with-backup policy",
+        "Cache hit with in-place policy returns before backup branch",
+        "Cache export fails partway",
+        "Existing backup"
+      ],
+      "acceptance": "Controlled hit/miss reproductions establish backup and original-preservation behavior; suspicion alone is not a confirmed defect.",
+      "metric": "Measure only after safety parity is proven; no speed target can bypass backup.",
+      "related": [
+        "ACT-03",
+        "CACHE-02"
+      ],
+      "requires": [
+        "isolated-cache",
+        "magick-cache",
+        "fake-executable"
+      ]
+    },
+    {
+      "id": "CACHE-04",
+      "group": "Cache and prepared viewing",
+      "title": "Precache jobs, progress and cancellation",
+      "sources": [
+        "/home/kkk/Apps/rust-feh/src/image_proc.rs",
+        "/home/kkk/Apps/rust-feh/src/main.rs",
+        "/home/kkk/Apps/rust-feh/specs/013-image-tools-magick-cache/spec.md"
+      ],
+      "symbols": [
+        "pre_cache_one",
+        "pre_cache_paths",
+        "tools_start_precache_job",
+        "poll_precache_job_rx"
+      ],
+      "tests": [
+        "cargo test --test integration_image_tools -- --list"
+      ],
+      "normal": [
+        "Precache snapshot completes with accurate count",
+        "Browsing stays responsive"
+      ],
+      "adverse": [
+        "Cache unavailable mid-job",
+        "Cancel with pending write",
+        "Folder changes",
+        "Mixed inaccessible files"
+      ],
+      "cases": [
+        "Precache snapshot completes with accurate count",
+        "Browsing stays responsive",
+        "Cache unavailable mid-job",
+        "Cancel with pending write",
+        "Folder changes",
+        "Mixed inaccessible files"
+      ],
+      "acceptance": "Job terminates with accurate successful/failed/skipped accounting and does not modify originals.",
+      "metric": "Measure per-image overhead, progress cadence and cancellation latency.",
+      "related": [
+        "BATCH-01",
+        "CACHE-01"
+      ],
+      "requires": [
+        "isolated-cache",
+        "magick-cache",
+        "display"
+      ]
+    },
+    {
+      "id": "CACHE-05",
+      "group": "Cache and prepared viewing",
+      "title": "Prepare-fast materialization, launch and cleanup",
+      "sources": [
+        "/home/kkk/Apps/rust-feh/src/image_proc.rs",
+        "/home/kkk/Apps/rust-feh/src/main.rs",
+        "/home/kkk/Apps/rust-feh/src/ui_logic.rs",
+        "/home/kkk/Apps/rust-feh/specs/013-image-tools-magick-cache/spec.md"
+      ],
+      "symbols": [
+        "prepare_fast_one",
+        "prepare_fast_set",
+        "tools_finish_prepare_fast",
+        "open_feh_on_prepared_fast"
+      ],
+      "tests": [
+        "cargo test --test integration_image_tools prepare_fast_set -- --nocapture",
+        "cargo test --test perf_sc_timing sc004 -- --nocapture"
+      ],
+      "normal": [
+        "Real optimized files are usable and listed",
+        "Viewer receives materialized paths"
+      ],
+      "adverse": [
+        "Partial prepare/cancel",
+        "Repeated prepare while viewer uses old files",
+        "Same filename from different folders",
+        "Shutdown during job"
+      ],
+      "cases": [
+        "Real optimized files are usable and listed",
+        "Viewer receives materialized paths",
+        "Partial prepare/cancel",
+        "Repeated prepare while viewer uses old files",
+        "Same filename from different folders",
+        "Shutdown during job"
+      ],
+      "acceptance": "Materialized outputs have unique correct identity and remain alive while consumers need them; originals unchanged.",
+      "metric": "Compare preparation plus first/subsequent view latency with raw path; report breakeven and peak disk/memory.",
+      "related": [
+        "LIFE-01",
+        "VIEW-05",
+        "BATCH-04"
+      ],
+      "requires": [
+        "magick",
+        "feh",
+        "display"
+      ]
+    },
+    {
+      "id": "CAP-01",
+      "group": "Capabilities and feedback",
+      "title": "Tool detection, recheck and mid-session loss",
+      "sources": [
+        "/home/kkk/Apps/rust-feh/src/tool_caps.rs",
+        "/home/kkk/Apps/rust-feh/src/main.rs",
+        "/home/kkk/Apps/rust-feh/specs/009-external-tool-runtime/spec.md"
+      ],
+      "symbols": [
+        "detect",
+        "refresh_tool_caps",
+        "mark_feh_unavailable",
+        "feh_spawn_unavailable"
+      ],
+      "tests": [
+        "cargo test --lib tool_caps::tests -- --nocapture"
+      ],
+      "normal": [
+        "Tool absent then present after recheck",
+        "Healthy recheck restores controls"
+      ],
+      "adverse": [
+        "Tool removed between detection and spawn",
+        "Permission denied vs genuinely missing",
+        "Different PATH per task"
+      ],
+      "cases": [
+        "Tool absent then present after recheck",
+        "Healthy recheck restores controls",
+        "Tool removed between detection and spawn",
+        "Permission denied vs genuinely missing",
+        "Different PATH per task"
+      ],
+      "acceptance": "Capabilities and controls reflect actual conditions; arbitrary spawn failures are not mislabeled as missing tools.",
+      "metric": "Measure detection process count and latency; no repeated full detection on idle frames.",
+      "related": [
+        "INSP-02",
+        "VIEW-01"
+      ],
+      "requires": [
+        "fake-executable"
+      ]
+    },
+    {
+      "id": "CAP-02",
+      "group": "Capabilities and feedback",
+      "title": "Format routes and advertised processing capability",
+      "sources": [
+        "/home/kkk/Apps/rust-feh/src/tool_caps.rs",
+        "/home/kkk/Apps/rust-feh/src/image_proc.rs",
+        "/home/kkk/Apps/rust-feh/src/scanner.rs",
+        "/home/kkk/Apps/rust-feh/docs/POSITIONING.md",
+        "/home/kkk/Apps/rust-feh/specs/008-tool-capabilities-panel/spec.md"
+      ],
+      "symbols": [
+        "format_routes",
+        "Handler",
+        "SpeedTier",
+        "has_external_magick"
+      ],
+      "tests": [
+        "cargo test --lib format_routes -- --nocapture"
+      ],
+      "normal": [
+        "Common-format native route",
+        "Optional exotic route with external tool"
+      ],
+      "adverse": [
+        "Listed-but-not-decodable formats",
+        "magick versus convert availability",
+        "Documentation claims without reachable implementation"
+      ],
+      "cases": [
+        "Common-format native route",
+        "Optional exotic route with external tool",
+        "Listed-but-not-decodable formats",
+        "magick versus convert availability",
+        "Documentation claims without reachable implementation"
+      ],
+      "acceptance": "Discovery, stage decoding, processing and viewer support are distinguished accurately; unsupported claims become documentation findings.",
+      "metric": "Measure capability-render overhead and ensure route hints are not mistaken for benchmarks.",
+      "related": [
+        "SCAN-04",
+        "IMAGE-03"
+      ],
+      "requires": [
+        "fixture"
+      ]
+    },
+    {
+      "id": "CAP-03",
+      "group": "Capabilities and feedback",
+      "title": "Dependency guidance and format UI",
+      "sources": [
+        "/home/kkk/Apps/rust-feh/src/main.rs",
+        "/home/kkk/Apps/rust-feh/src/tool_caps.rs",
+        "/home/kkk/Apps/rust-feh/specs/008-tool-capabilities-panel/spec.md",
+        "/home/kkk/Apps/rust-feh/specs/012-ui-feedback-polish/spec.md"
+      ],
+      "symbols": [
+        "render_dependency_row",
+        "render_format_discovery_body",
+        "dependencies",
+        "operation_timings"
+      ],
+      "tests": [
+        "cargo test --lib dependencies_ -- --nocapture",
+        "cargo test --lib operation_timings -- --nocapture"
+      ],
+      "normal": [
+        "Missing required tool exposes guidance",
+        "Install/copy/recheck controls discoverable"
+      ],
+      "adverse": [
+        "Optional tool missing does not block core workflow",
+        "Long hints and detached section",
+        "Network probe disabled reason"
+      ],
+      "cases": [
+        "Missing required tool exposes guidance",
+        "Install/copy/recheck controls discoverable",
+        "Optional tool missing does not block core workflow",
+        "Long hints and detached section",
+        "Network probe disabled reason"
+      ],
+      "acceptance": "Hints, required/optional distinctions and enabled actions agree with runtime capability snapshot.",
+      "metric": "Measure expensive checks during rendering and duplicate guidance updates.",
+      "related": [
+        "CAP-01",
+        "INSP-03"
+      ],
+      "requires": [
+        "display"
+      ]
+    },
+    {
+      "id": "OBS-01",
+      "group": "Capabilities and feedback",
+      "title": "Progress, status precedence and busy repaint",
+      "sources": [
+        "/home/kkk/Apps/rust-feh/src/main.rs",
+        "/home/kkk/Apps/rust-feh/src/ui_logic.rs",
+        "/home/kkk/Apps/rust-feh/specs/012-ui-feedback-polish/spec.md"
+      ],
+      "symbols": [
+        "is_activity_busy",
+        "request_repaint_if_busy",
+        "post_scan_status",
+        "render_session_status_body"
+      ],
+      "tests": [
+        "cargo test --lib post_scan_ -- --nocapture",
+        "cargo test --test feature_001_validation v3_status -- --nocapture"
+      ],
+      "normal": [
+        "Scan/job progress appears and clears",
+        "Required dependency warning survives successful load"
+      ],
+      "adverse": [
+        "Concurrent scan and job",
+        "Error followed by unrelated success",
+        "Cancelled job leaves spinner",
+        "Idle redraw loop"
+      ],
+      "cases": [
+        "Scan/job progress appears and clears",
+        "Required dependency warning survives successful load",
+        "Concurrent scan and job",
+        "Error followed by unrelated success",
+        "Cancelled job leaves spinner",
+        "Idle redraw loop"
+      ],
+      "acceptance": "Status does not report stale success or permanent busy state; important errors remain actionable.",
+      "metric": "Measure idle/busy CPU, repaint cadence and status latency.",
+      "related": [
+        "INSP-02",
+        "BATCH-01"
+      ],
+      "requires": [
+        "display"
+      ]
+    },
+    {
+      "id": "OBS-02",
+      "group": "Capabilities and feedback",
+      "title": "Activity log retention, copy and error fidelity",
+      "sources": [
+        "/home/kkk/Apps/rust-feh/src/main.rs",
+        "/home/kkk/Apps/rust-feh/src/ui_logic.rs",
+        "/home/kkk/Apps/rust-feh/specs/011-browsing-experience-round/spec.md"
+      ],
+      "symbols": [
+        "log",
+        "join_activity_log",
+        "render_activity_log_body",
+        "status_text_for_copy"
+      ],
+      "tests": [
+        "cargo test --lib join_activity_log -- --nocapture",
+        "cargo test --lib format_action_outcome -- --nocapture"
+      ],
+      "normal": [
+        "Actions and warnings preserve paths/reasons",
+        "Copy log/status matches visible source"
+      ],
+      "adverse": [
+        "More than retention cap",
+        "Multiline/Unicode paths",
+        "Detached log",
+        "Sensitive tool arguments"
+      ],
+      "cases": [
+        "Actions and warnings preserve paths/reasons",
+        "Copy log/status matches visible source",
+        "More than retention cap",
+        "Multiline/Unicode paths",
+        "Detached log",
+        "Sensitive tool arguments"
+      ],
+      "acceptance": "Log stays bounded and useful without leaking secrets; copy checks run only with isolated clipboard.",
+      "metric": "Measure log churn and repeated joining cost under scan-warning load.",
+      "related": [
+        "CLIP-01",
+        "SCAN-03"
+      ],
+      "requires": [
+        "display",
+        "isolated-clipboard"
+      ]
+    },
+    {
+      "id": "VERIFY-01",
+      "group": "Verification infrastructure",
+      "title": "Test isolation, fixtures and honest skip accounting",
+      "sources": [
+        "/home/kkk/Apps/rust-feh/tests/unit/ui_logic.rs",
+        "/home/kkk/Apps/rust-feh/tests/integration/desktop_tools_variations.rs",
+        "/home/kkk/Apps/rust-feh/tests/integration/clipboard_copy.rs",
+        "/home/kkk/Apps/rust-feh/tests/integration/image_tools.rs",
+        "/home/kkk/Apps/rust-feh/Cargo.toml"
+      ],
+      "symbols": [
+        "HOME_LOCK",
+        "skip_unless_fixtures",
+        "display_available"
+      ],
+      "tests": [
+        "cargo test -- --list"
+      ],
+      "normal": [
+        "Every selected test is enumerated",
+        "Synthetic folders enable tests without personal libraries"
+      ],
+      "adverse": [
+        "Early returns appear as passes",
+        "Concurrent HOME mutation",
+        "Real cache/clipboard side effects",
+        "Zero tests matched"
+      ],
+      "cases": [
+        "Every selected test is enumerated",
+        "Synthetic folders enable tests without personal libraries",
+        "Early returns appear as passes",
+        "Concurrent HOME mutation",
+        "Real cache/clipboard side effects",
+        "Zero tests matched"
+      ],
+      "acceptance": "Produce executed/skipped/blocked inventory and an isolation recipe; do not run unsafe suites until prerequisites are satisfied.",
+      "metric": "Measure suite duration and flakiness by repeated isolated runs, not static test counts.",
+      "related": [
+        "VERIFY-02",
+        "CLIP-01"
+      ],
+      "requires": [
+        "fixture"
+      ]
+    },
+    {
+      "id": "VERIFY-02",
+      "group": "Verification infrastructure",
+      "title": "Benchmark fixtures, provenance and process ownership",
+      "sources": [
+        "/home/kkk/Apps/rust-feh/tests/perf/sc_timing.rs",
+        "/home/kkk/Apps/rust-feh/scripts/generate-perf-fixture.sh",
+        "/home/kkk/Apps/rust-feh/scripts/measure-resources.sh",
+        "/home/kkk/Apps/rust-feh/scripts/sample-rss.sh"
+      ],
+      "symbols": [
+        "sc002_cache_disabled_repeat_similar_timing",
+        "sc004_prepare_fast_batch_under_60s"
+      ],
+      "tests": [
+        "cargo test --test perf_sc_timing -- --list"
+      ],
+      "normal": [
+        "Metadata and real-image fixtures are separate",
+        "Measured binary matches recorded candidate"
+      ],
+      "adverse": [
+        "Nonzero duration mistaken for similar timing",
+        "Stale root binary",
+        "Global pkill",
+        "Peak sampling misses high-water mark"
+      ],
+      "cases": [
+        "Metadata and real-image fixtures are separate",
+        "Measured binary matches recorded candidate",
+        "Nonzero duration mistaken for similar timing",
+        "Stale root binary",
+        "Global pkill",
+        "Peak sampling misses high-water mark"
+      ],
+      "acceptance": "Define reproducible meaningful metrics and safe owned-PID capture; legacy scripts are reviewed before any execution.",
+      "metric": "Report repeated median/spread, build mode, hardware and cold/warm state; no invented universal speedup threshold.",
+      "related": [
+        "VERIFY-01"
+      ],
+      "requires": [
+        "fixture"
+      ]
+    },
+    {
+      "id": "VERIFY-03",
+      "group": "Verification infrastructure",
+      "title": "Build, CI and packaging verification",
+      "sources": [
+        "/home/kkk/Apps/rust-feh/.github/workflows/ci.yml",
+        "/home/kkk/Apps/rust-feh/Cargo.toml",
+        "/home/kkk/Apps/rust-feh/Cargo.lock",
+        "/home/kkk/Apps/rust-feh/build-and-place.sh",
+        "/home/kkk/Apps/rust-feh/README.md"
+      ],
+      "symbols": [
+        "profile.release"
+      ],
+      "tests": [
+        "cargo test -- --list",
+        "cargo fmt --check",
+        "cargo clippy --all-targets -- -D warnings",
+        "cargo build --release"
+      ],
+      "normal": [
+        "Document exact current CI gates",
+        "Release binary and launcher use current build"
+      ],
+      "adverse": [
+        "Existing fmt/clippy drift",
+        "Missing optional runtime tools",
+        "Build script wrong cwd/shell",
+        "Untracked changes absent from baseline"
+      ],
+      "cases": [
+        "Document exact current CI gates",
+        "Release binary and launcher use current build",
+        "Existing fmt/clippy drift",
+        "Missing optional runtime tools",
+        "Build script wrong cwd/shell",
+        "Untracked changes absent from baseline"
+      ],
+      "acceptance": "Separate baseline failures from regressions; no unrelated formatting rewrite or dependency upgrades to make gates appear green.",
+      "metric": "Measure build/release size only on matching revision/profile and report reproducibility limits.",
+      "related": [
+        "VERIFY-01"
+      ],
+      "requires": [
+        "fixture"
+      ]
+    },
+    {
+      "id": "VERIFY-04",
+      "group": "Verification infrastructure",
+      "title": "Requirement and source coverage reconciliation",
+      "sources": [
+        "/home/kkk/Apps/rust-feh/README.md",
+        "/home/kkk/Apps/rust-feh/docs/POSITIONING.md",
+        "/home/kkk/Apps/rust-feh/.agents/BACKLOG.md",
+        "/home/kkk/Apps/rust-feh/.agents/BOARD.md",
+        "/home/kkk/Apps/rust-feh/.specify/feature.json",
+        "/home/kkk/Apps/rust-feh/src/lib.rs"
+      ],
+      "symbols": [
+        "scanner",
+        "image_proc",
+        "tool_caps",
+        "types",
+        "ui_logic"
+      ],
+      "tests": [
+        "git ls-files",
+        "cargo test -- --list"
+      ],
+      "normal": [
+        "Each active entry point/helper has one primary board",
+        "Specs 002/004 map to successor behavior"
+      ],
+      "adverse": [
+        "README wallpaper claim lacks reachable spawn",
+        "Deferred 015 treated as shipped",
+        "Historical completed status conflicts with evidence",
+        "Unmapped public helper"
+      ],
+      "cases": [
+        "Each active entry point/helper has one primary board",
+        "Specs 002/004 map to successor behavior",
+        "README wallpaper claim lacks reachable spawn",
+        "Deferred 015 treated as shipped",
+        "Historical completed status conflicts with evidence",
+        "Unmapped public helper"
+      ],
+      "acceptance": "Publish an auditable source-to-board/requirement/test matrix; uncovered code is explicitly assigned or excluded with reason, never silently ignored.",
+      "metric": "This is coverage reconciliation, not a performance task; count uncovered behaviors rather than lines alone.",
+      "related": [
+        "CAP-02",
+        "VERIFY-01"
+      ],
+      "requires": [
+        "fixture"
+      ]
+    }
+  ]
+}
