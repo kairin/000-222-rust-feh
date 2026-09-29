@@ -54,78 +54,106 @@ fn create_rust_feh_app(
     // viewers that outlived rust-feh (contract: "stale handoff files under
     // runtime cache are cleaned at next startup").
     let _ = cleanup_stale_handoffs();
-    let initial_open = initial_open_sections(deps_section_open, tools_panel_ok);
-    // Seed the auto-expand machine's ownership from the startup fold set so
-    // startup auto-opens retract through the edge machine (018 FIX-1).
-    let auto_expand = AutoExpandState::seeded(&initial_open);
-    Box::new(RustFehApp {
-        current_dir: None,
-        images: vec![],
-        selected: None,
+    Box::new(RustFehApp::new(
         status,
-        debug_logs: vec![],
-        search: String::new(),
-        prior_search: String::new(),
-        recursive: false,
-        deep_scan_magick: false,
         feh_available,
         tool_caps,
-        scanning: false,
-        scroll_generation: 0,
-        sort_mode: SortMode::default(),
-        prior_sort_mode: SortMode::default(),
-        window_size: window_prefs.preset,
-        prior_window_size: window_prefs.preset,
-        window_resizable: window_prefs.resizable,
-        prior_window_resizable: window_prefs.resizable,
-        window_prefs_applied: false,
-        scan_inventory: None,
-        list_view_mode: ListViewMode::default(),
-        tree_expanded_paths: default_tree_expanded(),
-        scan_generation: 0,
-        scan_rx: None,
-        scan_cancel: Arc::new(AtomicBool::new(false)),
-        subfolders: Vec::new(),
-        subfolders_dir: None,
-        subfolder_generation: 0,
-        subfolder_rx: None,
-        subfolders_pending: false,
-        pending_select_path: None,
-        detached: HashMap::new(),
-        inspector_open: initial_open,
-        inspector_drawer_collapsed: true,
-        auto_expand,
-        prior_folder_present: true,
-        format_route_open: HashSet::new(),
-        start_folder_loaded: false,
-        image_tools: ImageToolsService::new(None),
-        cache_config: CacheConfig {
-            default_ttl: "90 days".into(),
-            ..CacheConfig::default()
-        },
-        tools_panel: ImageToolsPanelState::default(),
-        tools_job: None,
-        prepared_fast: None,
-        prepare_fast_temp: None,
-        launch_entries: load_launch_list(),
-        selected_tree_folder: None,
-        stage_generation: 0,
-        stage_requested_path: None,
-        stage_state: StageState::Loading,
-        stage_rx: None,
-        stage_texture: None,
-        stage_pane_collapsed: false,
-        action_prefs: load_action_prefs(),
-        round_trips: Vec::new(),
-        next_viewer_id: 0,
-        pending_scroll_path: None,
-        images_revision: 0,
-        list_index_cache: std::cell::RefCell::new(None),
-        tree_rows_cache: Vec::new(),
-        tree_rows_cache_key: None,
-        inspector_width_cache: None,
-    })
+        deps_section_open,
+        tools_panel_ok,
+        (window_prefs, load_launch_list(), load_action_prefs()),
+    ))
 }
+
+impl RustFehApp {
+    fn new(
+        status: String,
+        feh_available: bool,
+        tool_caps: ToolCapabilities,
+        deps_section_open: bool,
+        tools_panel_ok: bool,
+        (window_prefs, launch_entries, action_prefs): (
+            WindowPreferences,
+            FehLaunchList,
+            ActionPrefs,
+        ),
+    ) -> Self {
+        let initial_open = initial_open_sections(deps_section_open, tools_panel_ok);
+        // Seed the auto-expand machine's ownership from the startup fold set so
+        // startup auto-opens retract through the edge machine (018 FIX-1).
+        let auto_expand = AutoExpandState::seeded(&initial_open);
+        Self {
+            current_dir: None,
+            images: vec![],
+            selected: None,
+            status,
+            debug_logs: vec![],
+            search: String::new(),
+            prior_search: String::new(),
+            recursive: false,
+            deep_scan_magick: false,
+            feh_available,
+            tool_caps,
+            scanning: false,
+            scroll_generation: 0,
+            sort_mode: SortMode::default(),
+            prior_sort_mode: SortMode::default(),
+            window_size: window_prefs.preset,
+            prior_window_size: window_prefs.preset,
+            window_resizable: window_prefs.resizable,
+            prior_window_resizable: window_prefs.resizable,
+            window_prefs_applied: false,
+            scan_inventory: None,
+            list_view_mode: ListViewMode::default(),
+            tree_expanded_paths: default_tree_expanded(),
+            scan_generation: 0,
+            scan_rx: None,
+            scan_cancel: Arc::new(AtomicBool::new(false)),
+            subfolders: Vec::new(),
+            subfolders_dir: None,
+            subfolder_generation: 0,
+            subfolder_rx: None,
+            subfolders_pending: false,
+            pending_select_path: None,
+            detached: HashMap::new(),
+            inspector_open: initial_open,
+            inspector_drawer_collapsed: true,
+            auto_expand,
+            prior_folder_present: true,
+            format_route_open: HashSet::new(),
+            start_folder_loaded: false,
+            image_tools: ImageToolsService::new(None),
+            cache_config: CacheConfig {
+                default_ttl: "90 days".into(),
+                ..CacheConfig::default()
+            },
+            tools_panel: ImageToolsPanelState::default(),
+            tools_job: None,
+            prepared_fast: None,
+            prepare_fast_temp: None,
+            launch_entries,
+            selected_tree_folder: None,
+            stage_generation: 0,
+            stage_requested_path: None,
+            stage_state: StageState::Loading,
+            stage_rx: None,
+            stage_texture: None,
+            stage_pane_collapsed: false,
+            action_prefs,
+            round_trips: Vec::new(),
+            next_viewer_id: 0,
+            pending_scroll_path: None,
+            images_revision: 0,
+            list_index_cache: std::cell::RefCell::new(None),
+            tree_rows_cache: Vec::new(),
+            tree_rows_cache_key: None,
+            inspector_width_cache: None,
+        }
+    }
+}
+
+#[cfg(test)]
+#[path = "../tests/unit/app_inventory.rs"]
+mod app_inventory_tests;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 enum ToolsSingleOp {
@@ -629,6 +657,20 @@ impl RustFehApp {
         };
         *self.list_index_cache.borrow_mut() = Some((key, value.clone()));
         value
+    }
+
+    /// Keep list/tree caches and aggregate counts in sync after asset mutations.
+    fn images_changed(&mut self) {
+        self.images_revision = self.images_revision.wrapping_add(1);
+        *self.list_index_cache.get_mut() = None;
+        self.tree_rows_cache_key = None;
+        if let Some(inventory) = self.scan_inventory.as_mut() {
+            *inventory = ScanInventory::from_entries(
+                &self.images,
+                inventory.non_image_skipped,
+                inventory.magick_identify_truncated,
+            );
+        }
     }
 
     /// Single entry point for changing the active folder (feature 017
@@ -1895,14 +1937,7 @@ impl RustFehApp {
             res.dest_path.clone(),
             AssetStatus::Processed,
         );
-        if let Some(ref inv) = self.scan_inventory {
-            let inventory = ScanInventory::from_entries(
-                &self.images,
-                inv.non_image_skipped,
-                inv.magick_identify_truncated,
-            );
-            self.scan_inventory = Some(inventory);
-        }
+        self.images_changed();
         self.log(format_image_tools_log(&res));
         self.status = format!("Created {}", res.dest_path.display());
     }
@@ -2084,14 +2119,7 @@ impl RustFehApp {
         for p in &paths {
             add_or_update_asset_in_inventory(&mut self.images, p.clone(), AssetStatus::Optimized);
         }
-        if let Some(ref inv) = self.scan_inventory {
-            let inventory = ScanInventory::from_entries(
-                &self.images,
-                inv.non_image_skipped,
-                inv.magick_identify_truncated,
-            );
-            self.scan_inventory = Some(inventory);
-        }
+        self.images_changed();
         self.prepared_fast = Some(set);
         self.status = format!(
             "Prepare Fast complete — {} optimized files ready",
@@ -4218,6 +4246,7 @@ impl RustFehApp {
                     produced.clone(),
                     AssetStatus::Processed,
                 );
+                self.images_changed();
                 self.record_action_outcome(action, path, None, Ok(Some(produced)));
             }
             Err(reason) => self.record_action_outcome(action, path, None, Err(reason)),
@@ -4248,8 +4277,7 @@ impl RustFehApp {
             .iter()
             .position(|&i| self.images[i].path == moved_path);
         self.images.retain(|e| e.path != moved_path);
-        // cache invariant: bump on every self.images mutation
-        self.images_revision = self.images_revision.wrapping_add(1);
+        self.images_changed();
         if !was_selected {
             return;
         }

@@ -3,8 +3,13 @@
 //! Pure logic: no egui. External tools via `std::process::Command` only.
 
 use image::{imageops::FilterType, DynamicImage, ImageFormat};
+
+#[cfg(test)]
+#[path = "../tests/unit/resize_safety.rs"]
+mod resize_safety;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
@@ -21,6 +26,11 @@ pub struct ProcessOptions {
     pub target_format: Option<String>,
     pub quality: Option<u8>,
     pub output_path: Option<PathBuf>,
+}
+
+/// Returns the width-to-height ratio, or `None` when the height is zero.
+pub fn aspect_ratio(width: u32, height: u32) -> Option<f64> {
+    (height != 0).then(|| width as f64 / height as f64)
 }
 
 pub fn has_external_magick() -> bool {
@@ -323,16 +333,26 @@ pub fn cache_probe(cache_root: &Path, passkey: Option<&Path>) -> bool {
 
 // --- Image ops (image crate + magick fallback) ---
 
+fn validate_resize_options(opts: &ProcessOptions) -> Result<(), String> {
+    if opts.percent.is_some_and(|p| !p.is_finite() || p <= 0.0) {
+        return Err("Resize percentage must be finite and greater than zero".into());
+    }
+    if opts.width == Some(0) || opts.height == Some(0) {
+        return Err("Resize dimensions must be greater than zero".into());
+    }
+    Ok(())
+}
+
 pub fn process_image(input: &Path, opts: &ProcessOptions) -> Result<PathBuf, String> {
+    validate_resize_options(opts)?;
     let out_path = opts
         .output_path
         .clone()
         .ok_or_else(|| "output_path required".to_string())?;
-    if let Some(parent) = out_path.parent() {
-        std::fs::create_dir_all(parent).ok();
-    }
     if has_external_magick() {
-        if let Ok(()) = run_magick_resize_convert(input, opts, &out_path) {
+        let output = PendingImageOutput::new(&out_path)?;
+        if let Ok(()) = run_magick_resize_convert(input, opts, &output.path) {
+            output.publish()?;
             return Ok(out_path);
         }
     }
@@ -401,21 +421,80 @@ pub fn decode_stage_rgba(path: &Path, max_edge: u32) -> Result<(u32, u32, Vec<u8
     Ok((fw, fh, rgba.into_raw()))
 }
 
+// Encode in a private sibling directory. Only a fully written result replaces
+// the destination; a failed external tool must not damage the fallback input.
+struct PendingImageOutput {
+    directory: PathBuf,
+    path: PathBuf,
+    destination: PathBuf,
+    permissions: Option<std::fs::Permissions>,
+}
+
+impl PendingImageOutput {
+    fn new(destination: &Path) -> Result<Self, String> {
+        use std::os::unix::fs::DirBuilderExt;
+        use std::sync::atomic::{AtomicU64, Ordering};
+        static NEXT: AtomicU64 = AtomicU64::new(0);
+        let permissions = match std::fs::symlink_metadata(destination) {
+            Ok(meta) if meta.is_file() => Some(meta.permissions()),
+            Ok(_) => return Err("Image destination must be a regular file".into()),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
+            Err(e) => return Err(e.to_string()),
+        };
+        let parent = destination.parent().filter(|p| !p.as_os_str().is_empty())
+            .unwrap_or_else(|| Path::new("."));
+        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+        for _ in 0..100 {
+            let directory = parent.join(format!(".rust-feh-image-{}-{}",
+                std::process::id(), NEXT.fetch_add(1, Ordering::Relaxed)));
+            match std::fs::DirBuilder::new().mode(0o700).create(&directory) {
+                Ok(()) => {}
+                Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,
+                Err(e) => return Err(e.to_string()),
+            }
+            let mut name = std::ffi::OsString::from("output");
+            if let Some(ext) = destination.extension() {
+                name.push(".");
+                name.push(ext);
+            }
+            let output = Self { path: directory.join(name), directory,
+                destination: destination.to_path_buf(), permissions };
+            std::fs::OpenOptions::new().write(true).create_new(true)
+                .open(&output.path).map_err(|e| e.to_string())?;
+            return Ok(output);
+        }
+        Err("Could not reserve image output directory".into())
+    }
+
+    fn publish(&self) -> Result<(), String> {
+        if let Some(permissions) = &self.permissions {
+            std::fs::set_permissions(&self.path, permissions.clone()).map_err(|e| e.to_string())?;
+        }
+        std::fs::File::open(&self.path).and_then(|f| f.sync_all()).map_err(|e| e.to_string())?;
+        std::fs::rename(&self.path, &self.destination).map_err(|e| e.to_string())
+    }
+}
+
+impl Drop for PendingImageOutput {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_file(&self.path);
+        let _ = std::fs::remove_dir(&self.directory);
+    }
+}
+
 fn write_image(
     img: &DynamicImage,
     out_path: &Path,
     quality: Option<u8>,
     target_format: Option<&str>,
 ) -> Result<PathBuf, String> {
-    if let Some(parent) = out_path.parent() {
-        std::fs::create_dir_all(parent).ok();
-    }
+    let output = PendingImageOutput::new(out_path)?;
     let ext = out_path
         .extension()
         .and_then(|e| e.to_str())
         .or(target_format)
         .unwrap_or("png");
-    let file = std::fs::File::create(out_path).map_err(|e| e.to_string())?;
+    let file = std::fs::File::create(&output.path).map_err(|e| e.to_string())?;
     let mut writer = std::io::BufWriter::new(file);
     match ext.to_lowercase().as_str() {
         "jpg" | "jpeg" => {
@@ -435,6 +514,9 @@ fn write_image(
                 .map_err(|e| e.to_string())?;
         }
     }
+    writer.flush().map_err(|e| e.to_string())?;
+    drop(writer);
+    output.publish()?;
     Ok(out_path.to_path_buf())
 }
 
@@ -522,6 +604,14 @@ impl ImageToolsService {
         op: ImageOperation,
         policy: OutputPolicy,
     ) -> Result<ProcessedResult, String> {
+        if let ImageOperation::Resize { width, height, percent, .. } = &op {
+            validate_resize_options(&ProcessOptions {
+                width: *width,
+                height: *height,
+                percent: *percent,
+                ..Default::default()
+            })?;
+        }
         let ext = default_ext_for_op(&op);
         let stem_suffix = op_output_suffix(&op);
         let dest = compute_output_path(source, stem_suffix, ext, &policy)?;

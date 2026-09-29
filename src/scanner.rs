@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: MIT
 //! Directory scanner (MVP sync version; will become async + cached + walkdir).
 
-use std::io;
+use std::io::{self, Read};
+use std::os::fd::OwnedFd;
+use std::os::unix::net::UnixStream;
 use std::path::Path;
-use std::process::Command;
+use std::process::{Command, Stdio};
 use walkdir::WalkDir;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -94,7 +96,7 @@ fn record_native_image(
 }
 
 fn try_magick_probe(path: std::path::PathBuf, state: &mut ScanWalkState<'_>) -> bool {
-    if !state.magick_identify {
+    if !state.magick_identify || state.magick_bin.is_none() {
         return false;
     }
     if *state.magick_identify_calls >= MAGICK_IDENTIFY_CAP {
@@ -104,10 +106,11 @@ fn try_magick_probe(path: std::path::PathBuf, state: &mut ScanWalkState<'_>) -> 
     if state.cancel.load(Ordering::Relaxed) {
         return false;
     }
-    if !is_magick_image(&path, state.magick_bin) {
+    // Budget attempts, including failures, rather than only successful images.
+    *state.magick_identify_calls += 1;
+    if !is_magick_image(&path, state.magick_bin, state.cancel) {
         return false;
     }
-    *state.magick_identify_calls += 1;
     state
         .entries
         .push(ImageEntry::with_status(path, FileStatus::MagickDetected));
@@ -140,6 +143,7 @@ fn resolve_magick_bin(magick_identify: bool) -> Option<std::path::PathBuf> {
     }
     which::which("magick")
         .ok()
+        .or_else(|| which::which("identify").ok())
         .or_else(|| which::which("convert").ok())
 }
 
@@ -243,18 +247,86 @@ fn is_obvious_non_image(path: &Path) -> bool {
     }
 }
 
-fn is_magick_image(path: &Path, magick_bin: Option<&Path>) -> bool {
+// Drain only a bounded chunk per poll: noisy output must not starve cancellation.
+// A nonblocking socket also avoids waiting for descendants retaining stdout.
+fn drain_probe_output(output: &mut UnixStream) -> io::Result<bool> {
+    let mut seen = false;
+    let mut buffer = [0; 4096];
+    for _ in 0..16 {
+        match output.read(&mut buffer) {
+            Ok(0) => break,
+            Ok(_) => seen = true,
+            Err(e) if e.kind() == io::ErrorKind::WouldBlock => break,
+            Err(e) if e.kind() == io::ErrorKind::Interrupted => continue,
+            Err(e) => return Err(e),
+        }
+    }
+    Ok(seen)
+}
+
+fn is_magick_image(path: &Path, magick_bin: Option<&Path>, cancel: &AtomicBool) -> bool {
     let Some(bin) = magick_bin else {
         return false;
     };
-    Command::new(bin)
-        .arg(path)
-        .arg("-format")
-        .arg("%m")
-        .output()
-        .map(|o| o.status.success() && !o.stdout.is_empty())
-        .unwrap_or(false)
+    let Ok(path) = std::path::absolute(path) else {
+        return false;
+    };
+    let mut command = Command::new(bin);
+    match bin.file_name().and_then(|name| name.to_str()) {
+        Some("convert") => {
+            command.arg("-ping").arg(path).args(["-format", "%m", "info:"]);
+        }
+        name => {
+            if name == Some("magick") {
+                command.arg("identify");
+            }
+            command.args(["-ping", "-format", "%m"]).arg(path);
+        }
+    }
+    let Ok((mut output, writer)) = UnixStream::pair() else {
+        return false;
+    };
+    if output.set_nonblocking(true).is_err() {
+        return false;
+    }
+    let Ok(mut child) = command.stdin(Stdio::null()).stdout(Stdio::from(OwnedFd::from(writer)))
+        .stderr(Stdio::null()).spawn() else {
+        return false;
+    };
+    let mut has_format = false;
+    loop {
+        if cancel.load(Ordering::Relaxed) {
+            let _ = child.kill();
+            let _ = child.wait();
+            return false;
+        }
+        match drain_probe_output(&mut output) {
+            Ok(seen) => has_format |= seen,
+            Err(_) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return false;
+            }
+        }
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                // The child can emit its final bytes between the drain and wait.
+                has_format |= drain_probe_output(&mut output).unwrap_or(false);
+                return status.success() && has_format && !cancel.load(Ordering::Relaxed);
+            }
+            Ok(None) => std::thread::sleep(std::time::Duration::from_millis(2)),
+            Err(_) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return false;
+            }
+        }
+    }
 }
+
+#[cfg(test)]
+#[path = "../tests/unit/scanner_probes.rs"]
+mod probe_tests;
 
 #[cfg(test)]
 mod tests {
