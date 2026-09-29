@@ -2,9 +2,21 @@
 use std::fs;
 use std::path::PathBuf;
 
-use rust_feh::image_proc::{parse_crop_geometry, MagickCacheManager, ImageToolsService};
-use rust_feh::types::{CacheConfig, FitMode, ImageOperation, OutputPolicy, Filter};
+use rust_feh::image_proc::{
+    aspect_ratio, parse_crop_geometry, ImageToolsService, MagickCacheManager,
+};
+use rust_feh::types::{CacheConfig, Filter, FitMode, ImageOperation, OutputPolicy};
 use rust_feh::ui_logic::compute_output_path;
+
+#[test]
+fn aspect_ratio_handles_standard_zero_and_boundary_dimensions() {
+    assert_eq!(aspect_ratio(1920, 1080), Some(16.0 / 9.0));
+    assert_eq!(aspect_ratio(1080, 1920), Some(9.0 / 16.0));
+    assert_eq!(aspect_ratio(0, 1080), Some(0.0));
+    assert_eq!(aspect_ratio(1920, 0), None);
+    assert_eq!(aspect_ratio(0, 0), None);
+    assert_eq!(aspect_ratio(u32::MAX, 1), Some(u32::MAX as f64));
+}
 
 #[test]
 fn parse_crop_geometry_signed() {
