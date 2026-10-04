@@ -56,12 +56,9 @@ task file before doing anything.
   touches > 5 files or breaks a public contract.
 
 ## Resume durability
-- `.agents/{SPEC,BACKLOG,BOARD,ROUTING,GUARDRAILS}.md` + each feature `tasks.md` ARE the
-  system of record. On cold resume or compaction: RELOAD them before acting. Keep them
-  current — they are the handoff, not your context window.
+- `docs/UI-UX-REDESIGN.md` is the active product/UX authority and `docs/PROJECT-HISTORY.md`
+  is the shipped-outcome and evidence ledger. `.agents` files contain cross-cutting rules
+  and routing; feature task files are used only for authorized new implementation.
 
-## Multi-agent advisory rule (007 FR-006)
-Before changing scope, bucket classification, or implement order of anything covered by
-`specs/OUTSTANDING-ISSUES-ROADMAP.md`: seek advice (Codex / Grok / Hermes / DeepSeek 4 Pro /
-human maintainer) and record the outcome in the target feature spec.md **Clarifications**
-section (date, question, decision). Maintainer arbitration is final.
+## UX authority
+The active findings, decisions, and review outcomes are maintained in `docs/UI-UX-REDESIGN.md`; shipped decisions are in `docs/PROJECT-HISTORY.md`. Future changes to accepted UX scope require explicit maintainer authorization and an update to the active authority. Do not reopen retired feature-spec wording or add another generic reviewer loop.

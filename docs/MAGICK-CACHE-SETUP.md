@@ -100,7 +100,7 @@ IRIs use the form `project/type/resource-path` where `type` is `image`, `blob`, 
 
 1. Build and run: `cargo run --release` or `./target/release/rust-feh`
 2. Choose a folder with images
-3. **Inspector → Image actions → Image Tools → Cache** tab
+3. **existing Image Tools → Cache controls** tab
 4. Check **Enable cache**
 5. **Pick root…** → `~/.cache/rust-feh-magick` (or your cache path)
 6. **Pick passkey…** → `~/.magick-cache-passkey`
@@ -160,6 +160,5 @@ magick-cache -passkey ~/.magick-cache-passkey \
 
 ## Related docs
 
-- Feature spec: [specs/013-image-tools-magick-cache/spec.md](../specs/013-image-tools-magick-cache/spec.md)
-- Quickstart scenarios: [specs/013-image-tools-magick-cache/quickstart.md](../specs/013-image-tools-magick-cache/quickstart.md)
-- External tool contract: [specs/013-image-tools-magick-cache/contracts/magick-cache-tool.md](../specs/013-image-tools-magick-cache/contracts/magick-cache-tool.md)
+- Shipped feature decisions: [PROJECT-HISTORY.md](PROJECT-HISTORY.md)
+- Current product and UX requirements: [UI-UX-REDESIGN.md](UI-UX-REDESIGN.md)

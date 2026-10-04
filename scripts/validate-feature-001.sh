@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Automated validation for feature 001 (substitutes manual quickstart where possible).
+# Historical feature-001 automated checks; these do not replace current UX acceptance.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 FEATURE="specs/001-persistent-ui-virtual-browsing"
-RESULTS="$FEATURE/validation-results.md"
+RESULTS="${RUST_FEH_VALIDATION_RESULTS:-${TMPDIR:-/tmp}/rust-feh-feature-001-validation-results.md}"
 PASS=0
 FAIL=0
 SKIP=0
@@ -51,13 +51,7 @@ else
   pass "FR-007: pick_folder does not call open_in_feh"
 fi
 
-if rg -n 'TopBottomPanel::top\("controls"\)' "$MAIN" >/dev/null && \
-   rg -n 'SidePanel::right\("inspector"\)' "$MAIN" >/dev/null && \
-   rg -n 'session_status_header_rich|render_session_status_body' "$MAIN" >/dev/null; then
-  pass "FR-001/003: persistent top controls and inspector session status"
-else
-  fail "FR-001/003: missing persistent controls or inspector session status markers"
-fi
+skip "old top-controls/right-Inspector marker check retired; assess layout via docs/UI-UX-REDESIGN.md"
 
 if rg -n 'show_rows' "$MAIN" >/dev/null; then
   pass "FR-004: show_rows virtualization present"
@@ -83,10 +77,10 @@ else
   fail "FR-010: scanning indicator missing"
 fi
 
-if rg -n 'pick_folder' "$MAIN" >/dev/null && rg -n 'Choose folder' "$MAIN" >/dev/null; then
-  pass "FR-011: pick_folder wired"
+if rg -n 'pick_folder' "$MAIN" >/dev/null && rg -n 'ui\.button\("Open folder"\)' "$MAIN" >/dev/null; then
+  pass "FR-011: visible Open folder control wired"
 else
-  fail "FR-011: pick_folder missing"
+  fail "FR-011: visible Open folder control missing"
 fi
 
 echo "--- Maintainer trace ---"
@@ -110,31 +104,33 @@ fi
   echo "| Checks skipped | $SKIP |"
   echo "| cargo test | pass |"
   echo "| SC-003 filter 10k <200ms | see test sc003_filter_10k_under_200ms |"
-  echo "| SC-004 RSS <150MB | **pass** — see 003 validation-results (10k RSS audit) |"
-  echo "| SC-002 60fps scroll | **pass** — see 003 validation-results (10k rapid scrollbar drag) |"
+  echo "| SC-004 RSS | inherited historical target; not measured by this run |"
+  echo "| SC-002 scroll | historical subjective evidence only; not measured by this run |"
   echo ""
-  echo "## Quickstart mapping"
+  echo "## Historical quickstart mapping"
   echo ""
   echo "| Scenario | Automated |"
   echo "|----------|-----------|"
-  echo "| V1 layout scroll | static persistent-controls + inspector checks |"
-  echo "| V2 10k scroll/RSS | scan 10k test; RSS/scroll validated in 003 |"
+  echo "| V1 layout | static checks only; review current layout per docs/UI-UX-REDESIGN.md |"
+  echo "| V2 10k scroll/RSS | automated filter test only; manual evidence per current plan U4 |"
   echo "| V3 no auto-feh | status logic test + static grep |"
   echo "| V4 filter counter | filter + label tests |"
   echo "| V5 recursive | recursive scan test |"
   echo "| V6 debug log | static only (empty log policy in code) |"
-  echo "| V7 menu | static pick_folder/menu grep |"
+  echo "| V7 folder open | static pick_folder check only |"
   echo "| V8 feh missing | post_scan_status test |"
   echo "| V9 scan state | scanning static + empty scan test |"
   echo "| V10 scroll reset | scroll_generation static |"
   echo ""
-  echo "## GUI tier (feature 003)"
+  echo "## GUI tier (not run by this script)"
   echo ""
-  echo "RSS audit (SC-004 **pass**) and 10k scroll smoothness (SC-002 **pass**): [specs/003-gui-performance-validation/validation-results.md](../003-gui-performance-validation/validation-results.md)."
+  echo "Historical measurements: $ROOT/docs/PROJECT-HISTORY.md#feature-ledger"
+  echo "Current manual protocol: $ROOT/docs/UI-UX-REDESIGN.md#65-u4-integrated-evidence-and-current-documentation"
+  echo "This automated run does not claim a scroll or RSS pass."
 } > "$RESULTS"
 
 echo ""
-echo "Results written to $RESULTS"
+echo "Results written to $RESULTS (outside retained historical feature evidence by default)"
 echo "Passed: $PASS  Failed: $FAIL  Skipped: $SKIP"
 
 if [[ "$FAIL" -gt 0 ]]; then

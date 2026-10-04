@@ -280,8 +280,10 @@ pub enum AssetStatus {
 }
 
 /// State of the stage-pane decode for the current selection (feature 016).
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub enum StageState {
+    #[default]
+    Idle,
     Loading,
     Ready { width: u32, height: u32 },
     Failed { reason: String },
