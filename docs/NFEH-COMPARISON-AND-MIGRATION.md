@@ -161,7 +161,7 @@ Requires Node, Electron, and Linux packages `feh` + `bash` per `package.json` (f
 
 ### rust-feh
 
-```fish
+```bash
 # System deps
 sudo apt install feh
 sudo apt install imagemagick   # optional
