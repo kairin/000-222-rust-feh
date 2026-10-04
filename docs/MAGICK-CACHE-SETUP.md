@@ -16,14 +16,14 @@
 
 Install on Ubuntu/Debian:
 
-```fish
+```bash
 sudo apt install -y build-essential git pkg-config automake autoconf libtool \
     libmagickcore-7.q16-dev libmagickwand-7.q16-dev
 ```
 
 Verify headers:
 
-```fish
+```bash
 pkg-config --modversion MagickCore
 # Expected: 7.x (e.g. 7.1.2)
 ```
@@ -32,12 +32,12 @@ If `pkg-config` reports *Package 'MagickCore' not found*, install `libmagickcore
 
 ## Build and install magick-cache
 
-```fish
+```bash
 cd ~/Apps   # or any build directory
 git clone -b main https://github.com/ImageMagick/MagickCache.git
 cd MagickCache
 ./configure
-make -j(nproc)
+make -j"$(nproc)"
 sudo make install
 sudo ldconfig
 ```
@@ -54,16 +54,16 @@ install `automake autoconf libtool` and rerun `make`.
 
 After install, verify the binary and shared library:
 
-```fish
+```bash
 which magick-cache          # often /usr/local/bin/magick-cache
 magick-cache                  # prints version + usage
 ```
 
 If you get `error while loading shared libraries: libMagickCache.so.0`, run `sudo ldconfig` or add `/usr/local/lib` to your linker path.
 
-If `/usr/local/bin` is not on PATH (common in fish), either add it to config or symlink:
+If `/usr/local/bin` is not on PATH, either add it in a `~/.bashrc.d/` snippet or symlink:
 
-```fish
+```bash
 sudo ln -sf /usr/local/bin/magick-cache /usr/bin/magick-cache
 ```
 
@@ -71,7 +71,7 @@ sudo ln -sf /usr/local/bin/magick-cache /usr/bin/magick-cache
 
 Choose a cache root (SSD recommended) and a passkey file. **Keep the passkey safe** — without it you cannot get, identify, or expire your cached entries.
 
-```fish
+```bash
 mkdir -p ~/.cache/rust-feh-magick
 echo -n "your-secret-passkey" > ~/.magick-cache-passkey
 chmod 600 ~/.magick-cache-passkey
@@ -81,7 +81,7 @@ magick-cache -passkey ~/.magick-cache-passkey create ~/.cache/rust-feh-magick
 
 Sanity check (should list 0 resources on a new cache):
 
-```fish
+```bash
 magick-cache -passkey ~/.magick-cache-passkey identify ~/.cache/rust-feh-magick /
 ```
 
@@ -89,7 +89,7 @@ magick-cache -passkey ~/.magick-cache-passkey identify ~/.cache/rust-feh-magick 
 
 Upstream `magick-cache` uses **single-dash** flags and puts the **cache root** before the IRI:
 
-```fish
+```bash
 magick-cache -passkey <file> -ttl "90 days" put <cache-root> <iri> <input-file>
 magick-cache -passkey <file> get <cache-root> <iri> <output-file>
 ```
@@ -128,7 +128,7 @@ Basic resize/convert still works via the `image` crate when cache is disabled or
 
 ### Automated test
 
-```fish
+```bash
 cd /path/to/rust-feh
 cargo test --test integration_image_tools cache_repeat_resize_faster_when_cache_available -- --nocapture
 ```
@@ -137,7 +137,7 @@ Requires `magick-cache` on PATH and passkey at `~/.magick-cache-passkey` with ca
 
 ### Manual magick-cache put/get
 
-```fish
+```bash
 magick -size 32x32 xc:red /tmp/test-cache.png
 magick-cache -passkey ~/.magick-cache-passkey -ttl "90 days" \
   put ~/.cache/rust-feh-magick rustfeh/image/test/v1 /tmp/test-cache.png

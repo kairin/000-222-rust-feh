@@ -54,7 +54,7 @@ The existing Image Tools panel:
 
 Quick reference after install:
 
-```fish
+```bash
 # One-time (external; rust-feh does not run create for you)
 mkdir -p ~/.cache/rust-feh-magick
 echo -n "your-secret-passkey" > ~/.magick-cache-passkey
@@ -69,7 +69,7 @@ magick-cache -passkey ~/.magick-cache-passkey create ~/.cache/rust-feh-magick
 
 Since you saw "cargo not found", install the official toolchain with **rustup** (much better than apt's old cargo):
 
-```fish
+```bash
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ```
 
@@ -77,20 +77,20 @@ Follow the prompts (default is fine).
 
 Then either open a **new terminal** or run:
 
-```fish
-source ~/.cargo/env.fish
+```bash
+source ~/.cargo/env
 ```
 
 Verify:
 
-```fish
+```bash
 cargo --version
 rustc --version
 ```
 
 ### Optional: system libraries for GUI on Ubuntu/Debian
 
-```fish
+```bash
 sudo apt update
 sudo apt install -y build-essential pkg-config libssl-dev \
     libxcb1 libxcb-render0 libxcb-shape0 libxcb-xfixes0
@@ -131,7 +131,7 @@ There is no in-app RAM/CPU meter. Use the scripts below (or `ps` / `/proc`) from
 
 ![Automated resource measurement script output](docs/assets/readme-resource-measure.png)
 
-```fish
+```bash
 # Full protocol: 10k fixture, 60s of samples, PASS/FAIL vs 150 MB goal
 ./scripts/measure-resources.sh 10000 60
 
@@ -157,7 +157,7 @@ Test hook for scripts: `RUST_FEH_START_FOLDER=/path/to/images ./rust-feh` auto-l
 
 ## Build & Run
 
-```fish
+```bash
 cargo run --release
 ```
 
@@ -165,7 +165,7 @@ The binary ends up at `target/release/rust-feh`.
 
 To place a copy at the project root (as mentioned in the plan):
 
-```fish
+```bash
 ./build-and-place.sh
 ```
 
@@ -203,7 +203,7 @@ See [the active UX plan](docs/UI-UX-REDESIGN.md) for current requirements and th
 
 ## Verification
 
-```fish
+```bash
 ./scripts/validate-feature-001.sh
 ./scripts/validate-gui-performance.sh
 ```
