@@ -47,3 +47,26 @@
 - Live network-folder responsiveness and cancellation were not manually exercised in this environment. Existing cancellation/probe tests and code inspection cover the preserved scan path; no live NAS pass is claimed.
 
 - Publication gate after the compact-preview correction: fresh full tests passed (227 passed, 3 ignored), clippy passed, and release build passed. One preceding run failed `inherited_stdout_does_not_delay_probe_completion` with the same rejected-probe tuple as the earlier scanner observation. It passed in isolation and the complete rerun passed; scanner code remains unchanged and the cause is unresolved.
+
+## Startup tool discovery — 2026-10-05
+
+Verified on main at `721d88f`, using the configured terminal's inherited PATH. The earlier missing-tool messages came from the isolated-PATH recovery test described under U3; they do not describe this normal-environment result.
+
+| Tool | Resolved executable | Actual app startup field |
+|------|---------------------|--------------------------|
+| feh | `/usr/bin/feh` | `feh_available: true` |
+| ImageMagick | `/usr/bin/magick` | `magick_available: true` |
+| magick-cache | `/usr/local/bin/magick-cache` | `magick_cache_available: true` |
+
+Evidence: shell lookup found the executables above. Release and debug builds succeeded. The release GUI launched without a missing-feh warning. Because desktop input injection did not open Installed tools, the stronger three-tool check used the unchanged debug app under GDB: stop immediately after `ToolCapabilities::detect()`, inspect the actual startup object, then continue into the GUI.
+
+```bash
+env -u RUST_FEH_START_FOLDER gdb -q --batch \
+  -ex 'set pagination off' -ex 'break src/main.rs:304' \
+  -ex run -ex 'print tool_caps' -ex continue \
+  --args target/debug/rust-feh
+```
+
+All three availability fields were `true`; continuing produced `App started. Use Open folder to load images. Open Activity log from Tools for details.` The breakpoint line applies to the recorded revision. PATH was not overridden, source and settings were unchanged, and the owned test processes were closed afterward.
+
+Limits: this proves startup discovery in that launch environment, not a fresh click-through of Installed tools or discovery from a desktop launcher with a different PATH. It does not verify external-tool operations or a configured magick-cache directory/passkey. The startup `magick_cache_ready` flag also appeared true, but currently only reflects executable availability; it is not evidence of a usable cache.
