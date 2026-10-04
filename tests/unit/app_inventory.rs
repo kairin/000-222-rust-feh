@@ -41,8 +41,6 @@ fn app(dir: &Path, paths: &[PathBuf]) -> RustFehApp {
             magick_cache_available: false,
             magick_cache_ready: false,
         },
-        false,
-        false,
         (
             WindowPreferences::default(),
             FehLaunchList::default(),

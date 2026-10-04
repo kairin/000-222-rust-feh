@@ -1,6 +1,6 @@
 # rust-feh
 
-![rust-feh — image list and Inspector (Browse, Image actions, Dependencies)](docs/assets/readme-screenshot.png)
+![rust-feh — central image browser with a resizable right preview](docs/assets/readme-screenshot.png)
 
 Linux-first **feh orchestrator**: browse and select images at scale in a lightweight GUI; open and navigate via **feh**. Lightweight resize for common formats uses the in-process `image` crate; optional ImageMagick extends format coverage when installed.
 
@@ -31,8 +31,7 @@ The archived nfeh codebase is preserved only as a reference snapshot and will be
 From-scratch Rust successor to archived **nfeh** — same broad idea (pick from a folder, act on images), different architecture: feh is actually invoked, lists scale to 10k+ images, and the runtime is a single native binary (egui/eframe, no Electron).
 
 - Original nfeh code lives in `archive/original-nfeh/` until rust-feh is fully verified.
-- **Positioning:** [docs/POSITIONING.md](docs/POSITIONING.md)
-- **nfeh comparison & migration:** [docs/NFEH-COMPARISON-AND-MIGRATION.md](docs/NFEH-COMPARISON-AND-MIGRATION.md)
+- **Active product and UX requirements:** [docs/UI-UX-REDESIGN.md](docs/UI-UX-REDESIGN.md) · **Shipped outcomes and retained evidence:** [docs/PROJECT-HISTORY.md](docs/PROJECT-HISTORY.md)
 
 ## Requirements
 
@@ -43,7 +42,7 @@ From-scratch Rust successor to archived **nfeh** — same broad idea (pick from 
 
 ### Image Tools & Magick Cache
 
-Inspector → **Image actions** → **Image Tools** panel:
+The existing Image Tools panel:
 
 - **Single / Batch**: resize (fit modes, filter, quality), numeric crop with live preview, format convert; safe output to subfolder or suffix; in-place requires double confirmation + backup.
 - **Rename**: pattern tokens `{original}`, `{ext}`, `{counter:03}`, `{date:YYYYMMDD}` with live preview.
@@ -115,18 +114,16 @@ Core modules: `scanner`, `ui_logic`, `tool_caps`, `image_proc`, `types` (GUI in 
 
 ### External tools (PATH)
 
-![Inspector — Browse, Image actions, detachable Dependencies & Format discovery](docs/assets/readme-tools.jpg)
-
-The **Inspector** (right panel) shows what is installed and how each format is routed. Detach **Dependencies** or **Format discovery** when you need more room.
+The current UI layout and intended redesign are documented in [UI-UX-REDESIGN.md](docs/UI-UX-REDESIGN.md).
 
 | Tool | Required? | Role |
 |------|-----------|------|
-| **feh** | Yes | Open images, slideshow, navigate the filtered filelist (**Inspector → Image actions**) |
+| **feh** | Yes | Open images, slideshow, navigate the filtered filelist (existing Image actions) |
 | **ImageMagick** (`magick` / `convert`) | Optional | Magick-detect unlisted formats at scan; convert/view exotic types |
 | **magick-cache** | Optional | Persistent image cache + Prepare Fast feh ([setup guide](docs/MAGICK-CACHE-SETUP.md)) |
-| **image crate** | Built-in | Quick resize demo — no external deps |
+| **image crate** | Built-in | Resize supported, decodable image selections |
 
-After installing a missing tool, click **Recheck tools on PATH** in **Inspector → Dependencies** (not a top-level Tools menu).
+After installing a missing tool, use the existing **Recheck tools on PATH** action.
 
 ## Resource usage
 
@@ -174,22 +171,20 @@ To place a copy at the project root (as mentioned in the plan):
 
 Then you can run `./rust-feh` from the root.
 
-## Current Features (MVP)
+## Current workspace
 
-- **Menubar** (File, View) + **Inspector** side panel with detachable segments (Browse, Image actions, Session status, Activity log, Dependencies, Format discovery)
+- The active browser-first layout and acceptance criteria are described in [UI-UX-REDESIGN.md](docs/UI-UX-REDESIGN.md).
 - **Virtualized browsing**: `show_rows` for flat list and folder tree — smooth on 10k+ images (metadata only)
 - **Flat list**: Folder + Filename + **Status** columns (`native`, `magick · awaiting convert`, `converted`)
 - **Folder tree**: toggle Flat list / Folder tree; expand/collapse folders with per-folder counts
-- **Scan inventory bar**: after each scan — native listed, magick-detected, converted, awaiting convert, non-image skipped
-- **Filter & sort**: in **Inspector → Browse**; Path / Name / Folder sort with scroll reset
-- Choose folder (**Browse** or File menu); native formats (jpg, png, webp, gif, bmp) plus optional ImageMagick identify for unlisted types
+- **Scan inventory**: native listed, magick-detected, converted, awaiting convert, and non-image skipped counts are available in Tools → Session status and inventory.
+- **Filter and sort**: visible above the central list; Path / Name / Folder sort with scroll reset. Up, current path, List/Tree, and subfolder navigation stay with the browser.
+- **Open folder** loads a folder; native formats (jpg, png, webp, gif, bmp) plus optional ImageMagick identify for unlisted types
 - Select image in list; first image auto-selected on load — **feh does not auto-launch**
-- **Open in feh** and **Quick resize** in **Inspector → Image actions** (filelist across filtered list for feh) — **Open in feh** is a round-trip: browse in feh, and closing it stages the image you were on back in rust-feh, ready for the right-click actions below
-- **Stage pane + context menu** (feature 016): the current selection is displayed in a stage pane below the list (fit-to-pane, lazy off-thread decode); right-click it for save a copy…, move to…, resize copy, convert format, copy path, or copy image — no need to visit the Image Tools panel for a quick resize/convert
+- **Open in feh** and **More** are visible for the current selection; More reuses existing Save a copy, Move to, Resize, Convert, Copy path, and Copy image actions. Open in feh is a round-trip: closing it returns the viewed image to the preview.
+- The selected image appears in a resizable right Preview; narrow windows switch to the same preview body with a Back to list control. Preview decoding remains asynchronous.
 - Graceful degradation when `feh` is missing (disabled buttons, clear status message)
-- Quick resize demo (50%, powered by the `image` crate; `*_processed.*` tracked in inventory)
-- **Dependencies** + **Format discovery** in Inspector: PATH status, install hints, per-format routing
-- **Activity log** (detachable): selectable text, Copy log / Clear logs; **Session status** has Copy status + rotating speed tips
+- Existing scan settings, Image Tools and pinning, saved feh launches, status/inventory, activity log, format support, and installed-tool recovery are available on demand from **Tools**.
 - **Feh-first scanning**: extension-only scan by default (~milliseconds on large photo folders); list fills incrementally; **Open in feh** works while scan runs; optional “Detect exotic formats (slow)” for ImageMagick deep scan
 - **Background scanning**: UI stays responsive on large or network paths; NAS/GVFS never run per-file ImageMagick identify
 - **Session status** scan pulse + animated dots during scan
@@ -198,40 +193,25 @@ Further work is possible in areas such as thumbnail grid, richer tools, or confi
 
 ## Architecture (high level)
 
-See the approved plan for full details. Core modules (`scanner`, `image_proc`, `tool_caps`, `ui_logic`, `types`) are independent of the egui GUI; `main.rs` handles rendering and feh subprocess spawn.
+See [the active UX plan](docs/UI-UX-REDESIGN.md) for current requirements and the [project history](docs/PROJECT-HISTORY.md) for shipped outcomes. Core modules (`scanner`, `image_proc`, `tool_caps`, `ui_logic`, `types`) are independent of the egui GUI; `main.rs` handles rendering and feh subprocess spawn.
 
 ## Documentation
 
-| Doc | Purpose |
-|-----|---------|
-| [docs/POSITIONING.md](docs/POSITIONING.md) | Product positioning, messaging, claims |
-| [docs/NFEH-COMPARISON-AND-MIGRATION.md](docs/NFEH-COMPARISON-AND-MIGRATION.md) | nfeh vs rust-feh tools, formats, migration |
-| [specs/OUTSTANDING-ISSUES-ROADMAP.md](specs/OUTSTANDING-ISSUES-ROADMAP.md) | Feature backlog (002–007) |
-| [specs/001-persistent-ui-virtual-browsing/](specs/001-persistent-ui-virtual-browsing/) | Primary shipped feature spec |
-| [specs/005-image-list-presentation/](specs/005-image-list-presentation/) | Folder column, tree, inventory, status tags |
-| [specs/008-tool-capabilities-panel/spec.md](specs/008-tool-capabilities-panel/spec.md) | Tools panel (retroactive) |
-| [specs/009-external-tool-runtime/spec.md](specs/009-external-tool-runtime/spec.md) | PATH detect + recheck (supersedes 002) |
-| [specs/012-ui-feedback-polish/](specs/012-ui-feedback-polish/) | Status feedback, NAS scan policy, detach log |
-| [docs/MAGICK-CACHE-SETUP.md](docs/MAGICK-CACHE-SETUP.md) | Install magick-cache, passkey, rust-feh cache config, verification |
-| [specs/013-image-tools-magick-cache/quickstart.md](specs/013-image-tools-magick-cache/quickstart.md) | Image Tools end-to-end validation scenarios |
+- [Active product and UX plan](docs/UI-UX-REDESIGN.md)
+- [Shipped outcomes and historical evidence](docs/PROJECT-HISTORY.md)
+- [Magick-cache setup](docs/MAGICK-CACHE-SETUP.md)
 
 ## Verification
 
 ```fish
 ./scripts/validate-feature-001.sh
-```
-
-Runs build, clippy, tests (10k scan/filter perf, permission-denied, FR static checks). Feature 005: `cargo test feature_005`. Tool runtime: `cargo test tool_caps`.
-
-**GUI performance (feature 003)** — automated tier plus manual scroll/RSS protocol:
-
-```fish
 ./scripts/validate-gui-performance.sh
 ```
 
-Manual steps: [specs/003-gui-performance-validation/quickstart.md](specs/003-gui-performance-validation/quickstart.md). Results: [specs/003-gui-performance-validation/validation-results.md](specs/003-gui-performance-validation/validation-results.md).
-
-See also `specs/001-persistent-ui-virtual-browsing/validation-results.md` and `specs/005-image-list-presentation/gap-audit.md`.
+The feature 003 script runs its automated checks and prepares the existing fixture. For the
+manual interaction/performance protocol, use U4 in the active UX plan. Historical results
+remain at [feature 003 validation results](specs/003-gui-performance-validation/validation-results.md);
+see also the [feature 001 report](specs/001-persistent-ui-virtual-browsing/validation-results.md).
 
 ## License
 

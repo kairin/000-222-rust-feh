@@ -18,7 +18,7 @@
     - .specify/templates/checklist-template.md ✅ no changes needed
     - .specify/templates/constitution-template.md ✅ source of placeholders; no drift introduced
   Runtime guidance & command files reviewed (no edits required):
-    - README.md, docs/POSITIONING.md, docs/NFEH-COMPARISON-AND-MIGRATION.md (only reference principles by §I/§III/§IV etc.; module lists are descriptive, not contractual)
+    - README.md, docs/UI-UX-REDESIGN.md (only reference principles by §I/§III/§IV etc.; module lists are descriptive, not contractual)
     - AGENTS.md (only SPECKIT markers)
     - .specify/extensions/agent-context/commands/speckit.agent-context.update.md (uses generic "coding agent context file" + e.g. examples including CLAUDE.md; no CLAUDE-only guidance)
     - No .specify/templates/commands/*.md directory in this repo (commands provided via extensions/ when needed; checked per skill)
@@ -30,7 +30,7 @@
 
 ### I. Thin-Wrapper Architecture
 rust-feh is a GUI *frontend*, not a replacement for feh. feh handles viewing, zoom,
-navigation, and wallpaper-setting; rust-feh provides folder browsing, image selection,
+and navigation; rust-feh provides folder browsing, image selection,
 file listing, and launch orchestration.
 
 - Core modules (scanner, image_proc, types, ui_logic, tool_caps) MUST remain independent of the egui GUI.
@@ -80,7 +80,7 @@ the central value proposition.
 
 - `feh` MUST be detected or installable; the application MUST degrade gracefully
   with a clear status message if feh is missing.
-- Wallpaper-setting uses `feh --bg-fill` exclusively — no alternative backends.
+- Wallpaper support is outside rust-feh scope.
 - ImageMagick (`magick`/`convert`) is optional and MUST only enhance format support;
   the `image` crate is the always-available processor.
 - Other platforms (macOS, Windows via WSL) are NOT primary targets. Contributions

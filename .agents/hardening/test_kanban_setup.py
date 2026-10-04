@@ -2,19 +2,21 @@
 import copy
 import unittest
 import json
+from pathlib import Path
 from unittest.mock import patch
 
 from kanban_setup import create_args, existing_by_key, task_key, validate_manifest, seed_project, assert_card, run
 
 
 def sample():
+    repo = Path(__file__).resolve().parents[2]
     return {
         "baseline": "a" * 40,
-        "project": "/home/kkk/Apps/rust-feh",
+        "project": str(repo),
         "workspace_root": "/home/kkk/.cline/kanban-review-workspaces/rust-feh",
         "boards": [{
             "id": "SCAN-01", "group": "Discovery", "title": "Native classification",
-            "sources": ["/home/kkk/Apps/rust-feh/src/scanner.rs"],
+            "sources": [str(repo / "src/scanner.rs")],
             "symbols": ["scan_images"], "tests": ["cargo test --lib scanner::tests"],
             "cases": ["empty directory", "supported extension"],
             "acceptance": "Only supported entries are emitted; no pixel decode during listing.",

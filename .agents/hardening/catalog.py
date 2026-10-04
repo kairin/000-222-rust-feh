@@ -1,7 +1,7 @@
-"""Initial review inventory, not a claim of exhaustive or verified coverage."""
+"""Pinned-baseline review inventory, not exhaustive or verified coverage. Existing UI cards describe the inspected baseline only; they do not set current UX requirements. Follow docs/UI-UX-REDESIGN.md for accepted layout and behavior."""
 from pathlib import Path
 
-ROOT = Path('/home/kkk/Apps/rust-feh')
+ROOT = Path(__file__).resolve().parents[2]
 BOARDS = []
 
 
@@ -16,7 +16,7 @@ def board(key, group, title, files, symbols, tests, normal, adverse, acceptance,
 
 
 board('BOOT-01', 'Startup and lifecycle', 'Startup detection and GUI failure recovery',
-      'src/main.rs src/tool_caps.rs specs/006-window-viewer-stability/spec.md',
+      'src/main.rs src/tool_caps.rs docs/PROJECT-HISTORY.md',
       'try_run_gui detect_app_state build_native_options handle_gui_failure',
       'cargo test --lib tool_caps::tests -- --nocapture',
       'Healthy startup initializes one app|Missing feh produces actionable initial state',
@@ -25,7 +25,7 @@ board('BOOT-01', 'Startup and lifecycle', 'Startup detection and GUI failure rec
       'Measure startup wall time and probe count separately from first-folder load.',
       ('CAP-01', 'PREF-01'), ('display', 'feh'))
 board('BOOT-02', 'Startup and lifecycle', 'Startup folder and first-frame behavior',
-      'src/main.rs specs/017-lazy-folder-scanning/spec.md specs/018-inspector-ux-rework/spec.md',
+      'src/main.rs docs/PROJECT-HISTORY.md docs/UI-UX-REDESIGN.md',
       'maybe_load_start_folder navigate_to_folder sync_auto_expand_folder_edge',
       'cargo test --test unit_ui_logic initial_open_sections -- --nocapture',
       'No folder starts with Browse available|Valid start folder is loaded once',
@@ -34,7 +34,7 @@ board('BOOT-02', 'Startup and lifecycle', 'Startup folder and first-frame behavi
       'Count startup scans and first-frame work; do not add repeated filesystem probes.',
       ('NAV-01', 'INSP-02'), ('display',))
 board('LIFE-01', 'Startup and lifecycle', 'Shutdown and owned resource lifetime',
-      'src/main.rs src/ui_logic.rs specs/013-image-tools-magick-cache/spec.md',
+      'src/main.rs src/ui_logic.rs docs/PROJECT-HISTORY.md',
       'drop cancel_tools_job cleanup_prepare_fast_temp cleanup_stale_handoffs',
       'cargo test --lib cleanup_stale_handoffs -- --nocapture',
       'Idle close releases task-owned resources|Close after preparation cleans only owned files',
@@ -43,7 +43,7 @@ board('LIFE-01', 'Startup and lifecycle', 'Shutdown and owned resource lifetime'
       'Measure residual processes, temporary files and memory after repeated open/close cycles.',
       ('CACHE-05', 'VIEW-05'), ('display', 'feh'))
 board('PREF-01', 'Preferences and persistence', 'Window size, lock and persistence',
-      'src/main.rs src/ui_logic.rs src/types.rs tests/unit/ui_logic.rs specs/006-window-viewer-stability/spec.md',
+      'src/main.rs src/ui_logic.rs src/types.rs tests/unit/ui_logic.rs docs/PROJECT-HISTORY.md',
       'load_window_prefs save_window_prefs apply_startup_window_prefs apply_window_resize_policy',
       'cargo test --test unit_ui_logic window_prefs -- --nocapture;cargo test --lib clamp_window_size -- --nocapture',
       'Preset persists across restart|Resizable and locked modes honor bounds',
@@ -52,7 +52,7 @@ board('PREF-01', 'Preferences and persistence', 'Window size, lock and persisten
       'Count configuration writes and viewport commands during idle frames.',
       ('INSP-01', 'BOOT-01'), ('isolated-home', 'display'))
 board('PREF-02', 'Preferences and persistence', 'Launch-entry persistence and identity',
-      'src/ui_logic.rs src/types.rs src/main.rs tests/unit/ui_logic.rs specs/014-multi-feh-clipboard/spec.md',
+      'src/ui_logic.rs src/types.rs src/main.rs tests/unit/ui_logic.rs docs/PROJECT-HISTORY.md',
       'save_launch_list load_launch_list persist_launch_entries FehLaunchList',
       'cargo test --test unit_ui_logic test_launch_list -- --nocapture',
       'Add/edit/remove entries then reload|Distinct IDs survive serialization',
@@ -61,7 +61,7 @@ board('PREF-02', 'Preferences and persistence', 'Launch-entry persistence and id
       'Measure writes per edit and reload time with many entries; no per-frame writes.',
       ('VIEW-02',), ('isolated-home',))
 board('PREF-03', 'Preferences and persistence', 'Action destinations and safe configuration writes',
-      'src/ui_logic.rs src/main.rs src/types.rs tests/unit/ui_logic.rs specs/016-feh-viewer-actions/spec.md',
+      'src/ui_logic.rs src/main.rs src/types.rs tests/unit/ui_logic.rs docs/PROJECT-HISTORY.md',
       'save_action_prefs_to load_action_prefs_from pick_action_destination ActionPrefs',
       'cargo test --lib action_prefs -- --nocapture',
       'Selected destination survives reload|Cancelled destination picker changes nothing',
@@ -71,7 +71,7 @@ board('PREF-03', 'Preferences and persistence', 'Action destinations and safe co
       ('ACT-01', 'ACT-02'), ('isolated-home',))
 
 board('SCAN-01', 'Discovery', 'Native classification without pixel decoding',
-      'src/scanner.rs src/types.rs tests/feature_001_validation.rs specs/005-image-list-presentation/spec.md',
+      'src/scanner.rs src/types.rs tests/feature_001_validation.rs docs/PROJECT-HISTORY.md',
       'is_native_image is_obvious_non_image classify_walk_file',
       'cargo test --lib scanner::tests -- --nocapture;cargo test --test feature_001_validation scan_10k_supported_files -- --nocapture',
       'Supported extensions and case variants|Empty directory and non-image files',
@@ -79,7 +79,7 @@ board('SCAN-01', 'Discovery', 'Native classification without pixel decoding',
       'Listing classification follows its extension contract without decoding full images or claiming decodability.',
       'Measure classification throughput on 1k and 10k metadata-only entries.', ('SCAN-04', 'STAGE-01'))
 board('SCAN-02', 'Discovery', 'Traversal, recursion and filesystem boundaries',
-      'src/scanner.rs tests/feature_001_validation.rs specs/011-browsing-experience-round/spec.md',
+      'src/scanner.rs tests/feature_001_validation.rs docs/PROJECT-HISTORY.md',
       'walk_scan_files scan_images scan_images_streaming',
       'cargo test --test feature_001_validation v5_recursive_scan_includes_subdirs -- --nocapture;cargo test --lib scanner::tests -- --nocapture',
       'Shallow scan excludes nested files|Recursive scan covers nested folders',
@@ -87,7 +87,7 @@ board('SCAN-02', 'Discovery', 'Traversal, recursion and filesystem boundaries',
       'Traversal follows declared recursion/symlink policy and returns usable results with accurate warnings.',
       'Measure scaling with depth/file count and repeated metadata calls.', ('SCAN-03', 'SCAN-06'))
 board('SCAN-03', 'Discovery', 'Warning classification and bounded summaries',
-      'src/scanner.rs tests/feature_001_validation.rs specs/011-browsing-experience-round/spec.md',
+      'src/scanner.rs tests/feature_001_validation.rs docs/PROJECT-HISTORY.md',
       'format_walk_warning summarize_scan_warnings SCAN_WARNING_CAP',
       'cargo test --lib format_walk_warning -- --nocapture;cargo test --test feature_001_validation t068 -- --nocapture;cargo test --test feature_001_validation t069 -- --nocapture',
       'Permission warning preserves reason|Non-permission walk failure is visible',
@@ -95,7 +95,7 @@ board('SCAN-03', 'Discovery', 'Warning classification and bounded summaries',
       'Warning count/omission summary is accurate; permission tests prove the error actually occurred.',
       'Measure warning allocation/log growth for error-heavy trees.', ('OBS-02',))
 board('SCAN-04', 'Discovery', 'External format probing, budget and cancellation',
-      'src/scanner.rs src/tool_caps.rs specs/017-lazy-folder-scanning/spec.md',
+      'src/scanner.rs src/tool_caps.rs docs/PROJECT-HISTORY.md',
       'try_magick_probe is_magick_image MAGICK_IDENTIFY_CAP resolve_magick_bin',
       'cargo test --lib scanner::tests -- --nocapture',
       'Successful external classification|Disabled probe makes no subprocess calls',
@@ -104,7 +104,7 @@ board('SCAN-04', 'Discovery', 'External format probing, budget and cancellation'
       'Count launches and bound probe latency; inspect whether the cap applies to attempted or successful probes.',
       ('SCAN-06', 'CAP-02'), ('fake-executable', 'magick'))
 board('SCAN-05', 'Discovery', 'Network-path policy and expensive metadata',
-      'src/ui_logic.rs src/scanner.rs src/main.rs specs/012-ui-feedback-polish/spec.md',
+      'src/ui_logic.rs src/scanner.rs src/main.rs docs/PROJECT-HISTORY.md',
       'is_network_mount_path scan_magick_enabled scan_directory',
       'cargo test --lib network_mount_path -- --nocapture;cargo test --lib scan_magick_enabled -- --nocapture',
       'Recognized GVFS/SMB/NFS-like paths apply policy|Local path retains intended probe policy',
@@ -113,7 +113,7 @@ board('SCAN-05', 'Discovery', 'Network-path policy and expensive metadata',
       'Count metadata/probe work and record a real-network requirement separately from deterministic tests.',
       ('NAV-02', 'CAP-03'), ('fixture', 'network-optional'))
 board('SCAN-06', 'Scan lifecycle', 'Superseded worker cancellation',
-      'src/main.rs src/scanner.rs src/ui_logic.rs specs/017-lazy-folder-scanning/spec.md',
+      'src/main.rs src/scanner.rs src/ui_logic.rs docs/PROJECT-HISTORY.md',
       'scan_directory walk_scan_files apply_converted_detection_cancellable',
       'cargo test --lib apply_converted_detection_cancellable -- --nocapture;cargo test --lib scanner::tests -- --nocapture',
       'New scan cancels prior walk|Pre-cancelled converted pass exits',
@@ -121,7 +121,7 @@ board('SCAN-06', 'Scan lifecycle', 'Superseded worker cancellation',
       'Cancellation stops unnecessary work without suppressing the current scan; latency and limitations are evidenced.',
       'Measure cancellation-to-last-work latency and surviving thread/process count.', ('SCAN-04', 'SCAN-07'))
 board('SCAN-07', 'Scan lifecycle', 'Partial/completion ordering and generation rejection',
-      'src/main.rs specs/011-browsing-experience-round/spec.md specs/017-lazy-folder-scanning/spec.md',
+      'src/main.rs docs/PROJECT-HISTORY.md docs/PROJECT-HISTORY.md',
       'apply_scan_partial handle_scan_msg poll_scan_complete ScanMsg',
       'cargo test --test feature_001_validation -- --nocapture',
       'Current partial followed by complete|Several partials coalesce to newest',
@@ -129,7 +129,7 @@ board('SCAN-07', 'Scan lifecycle', 'Partial/completion ordering and generation r
       'Deterministic event traces prove only valid updates apply and final list, inventory and scanning flag agree.',
       'Measure full-list copying/coalescing cost and backlog growth under fast producers.', ('SCAN-08', 'LIST-03'))
 board('SCAN-08', 'Scan lifecycle', 'Converted merge and live inventory preservation',
-      'src/main.rs src/ui_logic.rs src/types.rs specs/018-inspector-ux-rework/spec.md',
+      'src/main.rs src/ui_logic.rs src/types.rs docs/UI-UX-REDESIGN.md',
       'merge_converted_statuses handle_scan_msg ScanInventory',
       'cargo test --lib merge_converted -- --nocapture;cargo test --lib inventory_rebuilt_from_live_list -- --nocapture',
       'Matching path upgrades status|Unmatched live entry remains',
@@ -138,7 +138,7 @@ board('SCAN-08', 'Scan lifecycle', 'Converted merge and live inventory preservat
       'Measure merge complexity and inventory rebuild at large counts.', ('ACT-02', 'BATCH-04', 'LIST-04'))
 
 board('NAV-01', 'Folder navigation', 'Unified picker, Up and breadcrumb navigation',
-      'src/main.rs specs/017-lazy-folder-scanning/spec.md',
+      'src/main.rs docs/PROJECT-HISTORY.md',
       'navigate_to_folder pick_folder render_inspector_nav_strip',
       'cargo test --test unit_ui_logic list_subfolders -- --nocapture',
       'Picker/subfolder/Up use same navigation semantics|Root breadcrumb stops at filesystem root',
@@ -146,7 +146,7 @@ board('NAV-01', 'Folder navigation', 'Unified picker, Up and breadcrumb navigati
       'All entry points set folder/search/selection consistently and do not cause duplicate scans.',
       'Measure navigation-to-first-result and redundant scan/subfolder requests.', ('BOOT-02', 'SCAN-06'), ('display',))
 board('NAV-02', 'Folder navigation', 'Asynchronous subfolder discovery',
-      'src/main.rs src/ui_logic.rs tests/unit/ui_logic.rs specs/017-lazy-folder-scanning/spec.md',
+      'src/main.rs src/ui_logic.rs tests/unit/ui_logic.rs docs/PROJECT-HISTORY.md',
       'list_subfolders request_subfolders poll_subfolders SubfolderMsg',
       'cargo test --test unit_ui_logic list_subfolders -- --nocapture',
       'Sorted immediate directories only|Empty folder clears prior subfolder rows',
@@ -154,7 +154,7 @@ board('NAV-02', 'Folder navigation', 'Asynchronous subfolder discovery',
       'Stale generations cannot populate current navigation; pending state clears on all completion paths.',
       'Measure requests per navigation and ensure render does not rewalk folders.', ('SCAN-05', 'NAV-01'))
 board('NAV-03', 'Folder navigation', 'Rescan selection and recursive-mode transitions',
-      'src/main.rs specs/017-lazy-folder-scanning/spec.md specs/018-inspector-ux-rework/spec.md',
+      'src/main.rs docs/PROJECT-HISTORY.md docs/UI-UX-REDESIGN.md',
       'scan_directory apply_scan_result pending_select_path selected_tree_folder',
       'cargo test --test feature_001_validation v5_recursive_scan_includes_subdirs -- --nocapture',
       'Rescan current folder|Switch shallow to recursive and back',
@@ -163,7 +163,7 @@ board('NAV-03', 'Folder navigation', 'Rescan selection and recursive-mode transi
       'Measure rescan work and time to stable selection.', ('VIEW-04', 'LIST-05'), ('display',))
 
 board('LIST-01', 'List data and interaction', 'Path-aware search filtering',
-      'src/ui_logic.rs src/main.rs tests/feature_001_validation.rs specs/005-image-list-presentation/spec.md',
+      'src/ui_logic.rs src/main.rs tests/feature_001_validation.rs docs/PROJECT-HISTORY.md',
       'entry_matches_search filter_indices compute_list_indices',
       'cargo test --lib filter_ -- --nocapture;cargo test --test feature_001_validation sc003_filter_10k_under_200ms -- --nocapture',
       'Filename and relative-folder matches|Empty query and zero matches',
@@ -171,7 +171,7 @@ board('LIST-01', 'List data and interaction', 'Path-aware search filtering',
       'Returned indices match the search contract and count; stale cached matches cannot leak across roots.',
       'Measure 1k/10k filtering separately from sorting and GUI frames.', ('LIST-03', 'LIST-05'))
 board('LIST-02', 'List data and interaction', 'Sort order and viewer-filelist parity',
-      'src/ui_logic.rs src/main.rs tests/feature_005_list.rs specs/005-image-list-presentation/spec.md',
+      'src/ui_logic.rs src/main.rs tests/feature_005_list.rs docs/PROJECT-HISTORY.md',
       'sort_key list_indices sort_mode_label write_feh_filelist',
       'cargo test --lib sort_by_ -- --nocapture;cargo test --lib feh_filelist_order -- --nocapture',
       'Path/name/folder sorts|Viewer order matches visible filtered order',
@@ -179,7 +179,7 @@ board('LIST-02', 'List data and interaction', 'Sort order and viewer-filelist pa
       'Order is reproducible and each list index remains associated with its correct path.',
       'Measure sort-key allocations and sort time with duplicates and long paths.', ('VIEW-01', 'LIST-03'))
 board('LIST-03', 'List data and interaction', 'Memoization and mutation invalidation',
-      'src/main.rs src/ui_logic.rs specs/017-lazy-folder-scanning/spec.md',
+      'src/main.rs src/ui_logic.rs docs/PROJECT-HISTORY.md',
       'compute_list_indices ListIndexKey TreeRowsKey images_revision',
       'cargo test --test feature_005_list -- --nocapture',
       'Repeated unchanged frames reuse data|Search/sort/root changes invalidate',
@@ -188,7 +188,7 @@ board('LIST-03', 'List data and interaction', 'Memoization and mutation invalida
       'Measure cache hit/miss calls and copied bytes at 1k/10k; optimization requires measured benefit.',
       ('SCAN-07', 'SCAN-08', 'BATCH-04'))
 board('LIST-04', 'List data and interaction', 'Tree building, expansion and inventory counts',
-      'src/ui_logic.rs src/types.rs src/main.rs tests/feature_005_list.rs specs/005-image-list-presentation/spec.md',
+      'src/ui_logic.rs src/types.rs src/main.rs tests/feature_005_list.rs docs/PROJECT-HISTORY.md',
       'build_folder_tree tree_visible_rows effective_expanded_paths ScanInventory',
       'cargo test --lib tree_ -- --nocapture;cargo test --lib inventory_ -- --nocapture',
       'Folder hierarchy and expansion|Filtered ancestors remain navigable',
@@ -196,7 +196,7 @@ board('LIST-04', 'List data and interaction', 'Tree building, expansion and inve
       'Visible rows, root counts and live inventory agree under filter and mutation sequences.',
       'Measure tree construction and flattening; verify work is not repeated every idle frame.', ('SCAN-08', 'LIST-03'))
 board('LIST-05', 'List data and interaction', 'Selection, scrolling and row targeting',
-      'src/main.rs specs/001-persistent-ui-virtual-browsing/spec.md specs/018-inspector-ux-rework/spec.md',
+      'src/main.rs docs/PROJECT-HISTORY.md docs/UI-UX-REDESIGN.md',
       'sync_selection_to_filter handle_image_row_click pending_flat_scroll_offset select_image',
       'cargo test --test feature_001_validation -- --nocapture',
       'Single click selects; explicit action opens|Sort/view toggle preserves intended selection',
@@ -204,7 +204,7 @@ board('LIST-05', 'List data and interaction', 'Selection, scrolling and row targ
       'Actions target the clicked/selected contract and pending scroll is not consumed prematurely.',
       'Measure click-to-stage and scroll-to-target latency.', ('NAV-03', 'ACT-02', 'STAGE-02'), ('display',))
 board('LIST-06', 'List data and interaction', 'Flat/tree virtualization and long-row layout',
-      'src/main.rs src/ui_logic.rs specs/018-inspector-ux-rework/spec.md',
+      'src/main.rs src/ui_logic.rs docs/UI-UX-REDESIGN.md',
       'render_flat_image_list render_tree_image_list ImageListMetrics sections_drawer_reserved_height',
       'cargo test --lib sections_drawer -- --nocapture;cargo test --test feature_005_list -- --nocapture',
       '10k rows scroll with bounded rendering|Long paths truncate with complete hover text',
@@ -213,7 +213,7 @@ board('LIST-06', 'List data and interaction', 'Flat/tree virtualization and long
       'Measure frame latency/row count while scrolling, resizing and expanding drawer.', ('INSP-01', 'LIST-04'), ('display', 'input-control'))
 
 board('INSP-01', 'Inspector', 'Inspector width and four-zone height budget',
-      'src/main.rs src/ui_logic.rs specs/018-inspector-ux-rework/plan.md',
+      'src/main.rs src/ui_logic.rs docs/UI-UX-REDESIGN.md',
       'inspector_width inspector_max_width render_inspector_panel sections_drawer_body_height',
       'cargo test --lib sections_drawer -- --nocapture',
       'Persistent navigation/list with collapsed drawer|Expanded drawer remains bounded',
@@ -221,7 +221,7 @@ board('INSP-01', 'Inspector', 'Inspector width and four-zone height budget',
       'Height remains bounded and width reclamps on resize; no unbounded outer scrolling breaks virtualization.',
       'Measure layout recalculation, font-measure calls and resize jitter.', ('LIST-06', 'PREF-01'), ('display',))
 board('INSP-02', 'Inspector', 'Drawer auto-expand state machine',
-      'src/ui_logic.rs src/main.rs tests/unit/ui_logic.rs specs/018-inspector-ux-rework/spec.md',
+      'src/ui_logic.rs src/main.rs tests/unit/ui_logic.rs docs/UI-UX-REDESIGN.md',
       'AutoExpandState sync_auto_expand_folder_edge toggle_inspector_section',
       'cargo test --lib auto_expand -- --nocapture;cargo test --test unit_ui_logic initial_open_sections -- --nocapture',
       'Rising edge opens once; falling edge retracts machine-owned sections|User-open section survives retraction',
@@ -229,7 +229,7 @@ board('INSP-02', 'Inspector', 'Drawer auto-expand state machine',
       'All trigger/user transitions have asserted ownership and suppression behavior; no per-frame reopening.',
       'Count state transitions and repaints rather than assuming animation cost.', ('CAP-01', 'BOOT-02'))
 board('INSP-03', 'Inspector', 'Section detach and reattach lifecycle',
-      'src/main.rs src/ui_logic.rs src/types.rs specs/018-inspector-ux-rework/spec.md',
+      'src/main.rs src/ui_logic.rs src/types.rs docs/UI-UX-REDESIGN.md',
       'render_detached_inspector_windows detached_window_chrome InspectorSection DetachedWindow',
       'cargo test --test unit_ui_logic initial_open_sections -- --nocapture',
       'Each of seven sections detaches/docks|Detached body matches docked controls',
@@ -237,7 +237,7 @@ board('INSP-03', 'Inspector', 'Section detach and reattach lifecycle',
       'Deterministic IDs/order, no duplicate control owner, and closing does not lose unrelated section state.',
       'Measure idle repaint and duplicate rendering with several detached sections.', ('INSP-04', 'OBS-01'), ('display', 'input-control'))
 board('INSP-04', 'Inspector', 'Pinned image context and safe action scope',
-      'src/main.rs src/ui_logic.rs tests/unit/ui_logic.rs specs/018-inspector-ux-rework/spec.md',
+      'src/main.rs src/ui_logic.rs tests/unit/ui_logic.rs docs/UI-UX-REDESIGN.md',
       'panel_context render_image_actions_pin_toggle pinned_path_in_filtered_list open_in_feh_pinned',
       'cargo test --test unit_ui_logic panel_context -- --nocapture',
       'Pin remains on image while live selection changes|Unpin follows live selection',
@@ -246,7 +246,7 @@ board('INSP-04', 'Inspector', 'Pinned image context and safe action scope',
       'Check pinned validation for per-frame filesystem work and filter membership cost.', ('VIEW-04', 'ACT-01', 'BATCH-01'), ('display',))
 
 board('STAGE-01', 'Selected-image stage', 'Decode, dimension bounds and aspect correctness',
-      'src/image_proc.rs src/ui_logic.rs src/types.rs tests/unit/image_proc.rs specs/016-feh-viewer-actions/spec.md',
+      'src/image_proc.rs src/ui_logic.rs src/types.rs tests/unit/image_proc.rs docs/PROJECT-HISTORY.md',
       'decode_stage_rgba stage_decode_bounds StagedImage',
       'cargo test --lib decode_stage_rgba -- --nocapture;cargo test --lib stage_decode_bounds -- --nocapture',
       'Landscape/portrait/small images fit within bounds|Real JPEG/PNG/WebP images decode',
@@ -254,7 +254,7 @@ board('STAGE-01', 'Selected-image stage', 'Decode, dimension bounds and aspect c
       'Returned dimensions/buffer size/aspect are valid and unsupported input is explicit; uncommitted aspect_ratio helper is not assumed in baseline.',
       'Measure decode wall time and peak allocation with real images, not fake JPEG names.', ('STAGE-02', 'IMAGE-01'))
 board('STAGE-02', 'Selected-image stage', 'Decode supersession and texture lifecycle',
-      'src/main.rs src/types.rs specs/016-feh-viewer-actions/spec.md',
+      'src/main.rs src/types.rs docs/PROJECT-HISTORY.md',
       'kick_stage_decode_if_selection_changed poll_stage_decode StageDecodeMsg render_stage_image',
       'cargo test --lib decode_stage_rgba -- --nocapture',
       'Selected image appears after decode|Unchanged selection avoids repeated decode',
@@ -263,7 +263,7 @@ board('STAGE-02', 'Selected-image stage', 'Decode supersession and texture lifec
       'Measure input-to-visible-image latency and retained texture/memory across repeated selection.',
       ('LIST-05', 'LIFE-01'), ('display',))
 board('STAGE-03', 'Selected-image stage', 'Stage empty/error state and action gating',
-      'src/main.rs src/ui_logic.rs specs/016-feh-viewer-actions/spec.md',
+      'src/main.rs src/ui_logic.rs docs/PROJECT-HISTORY.md',
       'render_stage_pane render_stage_status_line render_image_context_menu file_status_decodable',
       'cargo test --lib file_status_decodable -- --nocapture',
       'No selection shows intentional empty state|Stage remains image-only with status outside image',
@@ -272,7 +272,7 @@ board('STAGE-03', 'Selected-image stage', 'Stage empty/error state and action ga
       'Measure idle repaints and repeated error/decode retries.', ('ACT-04', 'OBS-01'), ('display', 'input-control'))
 
 board('VIEW-01', 'Viewer integration', 'Filelist, spawn arguments and isolated profile',
-      'src/ui_logic.rs src/main.rs tests/integration/feature_016_roundtrip.rs specs/011-browsing-experience-round/spec.md specs/016-feh-viewer-actions/spec.md',
+      'src/ui_logic.rs src/main.rs tests/integration/feature_016_roundtrip.rs docs/PROJECT-HISTORY.md docs/PROJECT-HISTORY.md',
       'viewer_spawn_command write_feh_filelist open_in_feh viewer_profile_dir',
       'cargo test --lib viewer_spawn_command -- --nocapture;cargo test --lib write_feh_filelist -- --nocapture',
       'Filtered sorted list starts at selected path|Geometry and viewer-profile isolation',
@@ -280,7 +280,7 @@ board('VIEW-01', 'Viewer integration', 'Filelist, spawn arguments and isolated p
       'Argument vector and handoff quoting are safe, list encoding limitations explicit, and personal feh profile unchanged.',
       'Measure filelist creation and launch-to-first-image separately.', ('LIST-02', 'CAP-01'), ('feh', 'display', 'isolated-home'))
 board('VIEW-02', 'Viewer integration', 'Launch entries, folders and multiple viewers',
-      'src/main.rs src/ui_logic.rs tests/unit/ui_logic.rs tests/integration/feature_014_folders.rs specs/014-multi-feh-clipboard/spec.md',
+      'src/main.rs src/ui_logic.rs tests/unit/ui_logic.rs tests/integration/feature_014_folders.rs docs/PROJECT-HISTORY.md',
       'build_entry_filelist entry_is_launchable launch_entry_feh launch_all_entries',
       'cargo test --test unit_ui_logic test_entry -- --nocapture;cargo test --test feature_014_folders -- --list',
       'Entry launches its own assigned folder|Launch all handles several entries independently',
@@ -289,7 +289,7 @@ board('VIEW-02', 'Viewer integration', 'Launch entries, folders and multiple vie
       'Count per-frame folder stats and launch-time scans; count-cache deferral is not new-feature authorization.',
       ('PREF-02', 'CAP-01'), ('feh', 'display', 'fixture-folders'))
 board('VIEW-03', 'Viewer integration', 'Handoff validation and deleted-image fallback',
-      'src/ui_logic.rs tests/integration/feature_016_roundtrip.rs specs/016-feh-viewer-actions/spec.md',
+      'src/ui_logic.rs tests/integration/feature_016_roundtrip.rs docs/PROJECT-HISTORY.md',
       'validate_handoff matching_filelist_index nearest_surviving_neighbor handoff_path',
       'cargo test --lib validate_handoff -- --nocapture;cargo test --test feature_016_roundtrip -- --nocapture',
       'Exact trusted filelist image resolves|Unchanged handoff preserves selection',
@@ -297,7 +297,7 @@ board('VIEW-03', 'Viewer integration', 'Handoff validation and deleted-image fal
       'Only trusted surviving entries are accepted; rejected content cannot cause arbitrary file operations.',
       'Measure validation work with large filelists and expensive canonicalization.', ('VIEW-04', 'VIEW-05'), ('isolated-home',))
 board('VIEW-04', 'Viewer integration', 'Return selection, cross-folder landing and exit order',
-      'src/main.rs specs/016-feh-viewer-actions/spec.md specs/017-lazy-folder-scanning/spec.md',
+      'src/main.rs docs/PROJECT-HISTORY.md docs/PROJECT-HISTORY.md',
       'poll_round_trip_viewers handle_round_trip_exit stage_selection_from_round_trip',
       'cargo test --test feature_016_roundtrip -- --nocapture',
       'Navigate in viewer then close and stage landed image|Cross-folder return navigates before selecting',
@@ -305,7 +305,7 @@ board('VIEW-04', 'Viewer integration', 'Return selection, cross-folder landing a
       'Exact GUI landing/scroll/stage behavior is demonstrated, not inferred from protocol-only tests.',
       'Measure close-to-correct-stage latency and redundant rescans.', ('NAV-03', 'LIST-05', 'INSP-04'), ('feh', 'display', 'input-control'))
 board('VIEW-05', 'Viewer integration', 'Viewer child ownership and handoff cleanup',
-      'src/main.rs src/ui_logic.rs tests/integration/feature_016_roundtrip.rs specs/016-feh-viewer-actions/spec.md',
+      'src/main.rs src/ui_logic.rs tests/integration/feature_016_roundtrip.rs docs/PROJECT-HISTORY.md',
       'spawn_round_trip_viewer poll_round_trip_viewers cleanup_stale_handoffs ViewerRoundTrip',
       'cargo test --lib cleanup_stale_handoffs -- --nocapture;cargo test --test feature_016_roundtrip handoff_path -- --nocapture',
       'Normal viewer exit cleans its handoff|Independent viewers remain isolated',
@@ -314,7 +314,7 @@ board('VIEW-05', 'Viewer integration', 'Viewer child ownership and handoff clean
       'Measure poll cost and stale-file accumulation over repeated viewer sessions.', ('LIFE-01', 'CACHE-05'), ('feh', 'isolated-home'))
 
 board('ACT-01', 'File actions and clipboard', 'Save-copy destination and collision safety',
-      'src/ui_logic.rs src/main.rs tests/integration/feature_016_actions.rs specs/016-feh-viewer-actions/spec.md',
+      'src/ui_logic.rs src/main.rs tests/integration/feature_016_actions.rs docs/PROJECT-HISTORY.md',
       'save_copy_to collision_suffixed_path action_save_copy',
       'cargo test --lib save_copy_to -- --nocapture;cargo test --lib collision_suffixed_path -- --nocapture',
       'Copy into new destination|Existing filename selects safe alternate',
@@ -322,7 +322,7 @@ board('ACT-01', 'File actions and clipboard', 'Save-copy destination and collisi
       'Original bytes remain unchanged; existing unrelated destinations are not clobbered; failure leaves a defined state.',
       'Measure copy overhead without treating safety checks as optional.', ('PREF-03', 'ACT-03'))
 board('ACT-02', 'File actions and clipboard', 'Loss-proof moves and post-move selection',
-      'src/ui_logic.rs src/main.rs tests/integration/feature_016_actions.rs specs/016-feh-viewer-actions/spec.md',
+      'src/ui_logic.rs src/main.rs tests/integration/feature_016_actions.rs docs/PROJECT-HISTORY.md',
       'plan_loss_proof_move execute_move_plan action_move_to advance_stage_after_move',
       'cargo test --lib loss_proof_move -- --nocapture;cargo test --test feature_016_actions -- --nocapture',
       'Same-filesystem move|Selected versus unselected source move updates correct row',
@@ -331,7 +331,7 @@ board('ACT-02', 'File actions and clipboard', 'Loss-proof moves and post-move se
       'Measure filesystem branches separately; do not optimize away preservation checks.',
       ('SCAN-08', 'LIST-05', 'ACT-03'), ('fixture', 'cross-filesystem-optional'))
 board('ACT-03', 'File actions and clipboard', 'Output policies, backups and write boundaries',
-      'src/image_proc.rs src/ui_logic.rs src/types.rs tests/unit/ui_logic.rs specs/013-image-tools-magick-cache/spec.md',
+      'src/image_proc.rs src/ui_logic.rs src/types.rs tests/unit/ui_logic.rs docs/PROJECT-HISTORY.md',
       'compute_output_path create_backup policy_requires_backup OutputPolicy',
       'cargo test --test unit_ui_logic compute_output_path -- --nocapture;cargo test --test integration_image_tools sc005 -- --nocapture',
       'Subfolder/suffix outputs preserve originals|In-place mode creates promised backup',
@@ -339,7 +339,7 @@ board('ACT-03', 'File actions and clipboard', 'Output policies, backups and writ
       'Each policy has explicit overwrite/backup/partial-write semantics and cannot silently violate original preservation.',
       'Measure backup/write overhead separately from transforms; safety behavior is invariant.', ('CACHE-03', 'IMAGE-03'))
 board('ACT-04', 'File actions and clipboard', 'Context-menu action dispatch and outcomes',
-      'src/main.rs src/ui_logic.rs specs/016-feh-viewer-actions/spec.md specs/018-inspector-ux-rework/spec.md',
+      'src/main.rs src/ui_logic.rs docs/PROJECT-HISTORY.md docs/UI-UX-REDESIGN.md',
       'render_image_context_menu run_derived_action record_action_outcome format_action_outcome',
       'cargo test --lib format_action_outcome -- --nocapture;cargo test --lib file_status_decodable -- --nocapture',
       'Stage/flat/tree context menus dispatch same behavior|Cancel is not success or failure',
@@ -347,7 +347,7 @@ board('ACT-04', 'File actions and clipboard', 'Context-menu action dispatch and 
       'Target, produced path, error and inventory effects are consistent across every action entry point.',
       'Measure synchronous action blocking and outcome-to-visible-state delay.', ('INSP-04', 'OBS-01'), ('display', 'input-control'))
 board('CLIP-01', 'File actions and clipboard', 'Copy path, pixels and clipboard availability',
-      'src/ui_logic.rs src/main.rs tests/integration/clipboard_copy.rs specs/014-multi-feh-clipboard/spec.md',
+      'src/ui_logic.rs src/main.rs tests/integration/clipboard_copy.rs docs/PROJECT-HISTORY.md',
       'copy_image_to_clipboard decode_image_to_rgba action_copy_image',
       'cargo test --test unit_ui_logic test_clipboard -- --nocapture;cargo test --test integration_clipboard_copy -- --list',
       'Copied path is exact|RGBA bytes/dimensions round-trip through isolated clipboard',
@@ -357,7 +357,7 @@ board('CLIP-01', 'File actions and clipboard', 'Copy path, pixels and clipboard 
       ('STAGE-01', 'OBS-02'), ('isolated-clipboard', 'display'))
 
 board('IMAGE-01', 'Image transformations', 'Resize dimensions, fit and filter semantics',
-      'src/image_proc.rs src/main.rs src/types.rs tests/unit/image_proc.rs specs/013-image-tools-magick-cache/spec.md',
+      'src/image_proc.rs src/main.rs src/types.rs tests/unit/image_proc.rs docs/PROJECT-HISTORY.md',
       'process_image process_image_crate tools_build_resize_op Filter FitMode',
       'cargo test --test unit_image_proc -- --nocapture;cargo test --test integration_image_tools single_resize -- --nocapture',
       'Width/height/percentage controls|Fit and filter selection match output geometry',
@@ -365,7 +365,7 @@ board('IMAGE-01', 'Image transformations', 'Resize dimensions, fit and filter se
       'Decoded output dimensions and aspect match chosen semantics; invalid input cannot produce destructive output.',
       'Measure decode/resize/encode phases and memory with identical images and build mode.', ('ACT-03', 'IMAGE-03'))
 board('IMAGE-02', 'Image transformations', 'Crop parsing, clamping and preview parity',
-      'src/image_proc.rs src/ui_logic.rs src/main.rs tests/unit/image_proc.rs tests/unit/ui_logic.rs specs/013-image-tools-magick-cache/spec.md',
+      'src/image_proc.rs src/ui_logic.rs src/main.rs tests/unit/image_proc.rs tests/unit/ui_logic.rs docs/PROJECT-HISTORY.md',
       'parse_crop_geometry clamp_crop crop_image crop_preview_pixels render_tools_crop_preview',
       'cargo test --test unit_image_proc parse_crop -- --nocapture;cargo test --test unit_ui_logic crop_preview -- --nocapture',
       'Valid positive geometry|Preview pixels and saved crop agree',
@@ -373,7 +373,7 @@ board('IMAGE-02', 'Image transformations', 'Crop parsing, clamping and preview p
       'Parsing and preview use the same coordinate semantics; invalid crops preserve original and show reason.',
       'Measure preview regeneration frequency and crop latency.', ('STAGE-02', 'ACT-03'))
 board('IMAGE-03', 'Image transformations', 'Encoding, conversion and external fallback',
-      'src/image_proc.rs src/tool_caps.rs tests/integration/image_tools.rs specs/013-image-tools-magick-cache/spec.md',
+      'src/image_proc.rs src/tool_caps.rs tests/integration/image_tools.rs docs/PROJECT-HISTORY.md',
       'write_image execute_op_to_path run_magick_resize_convert run_magick_crop',
       'cargo test --test integration_image_tools -- --list;cargo test --test unit_image_proc -- --nocapture',
       'Supported output formats decode correctly|Quality/filter choices reach intended backend',
@@ -383,7 +383,7 @@ board('IMAGE-03', 'Image transformations', 'Encoding, conversion and external fa
       ('CAP-02', 'ACT-03', 'CACHE-02'), ('magick', 'fake-executable'))
 
 board('BATCH-01', 'Batch and rename', 'Batch target snapshot, progress and cancellation',
-      'src/main.rs src/image_proc.rs specs/013-image-tools-magick-cache/spec.md',
+      'src/main.rs src/image_proc.rs docs/PROJECT-HISTORY.md',
       'tools_batch_paths tools_start_batch_job cancel_tools_job poll_batch_job_rx process_batch',
       'cargo test --test integration_image_tools batch_mixed_success_and_failure -- --nocapture',
       'Batch uses documented filtered target set|Progress accounts for every input',
@@ -391,7 +391,7 @@ board('BATCH-01', 'Batch and rename', 'Batch target snapshot, progress and cance
       'Input snapshot is explicit; cancellation and summary account for completed/failed/skipped work without corrupting outputs.',
       'Measure progress cadence, cancellation latency and UI blocking.', ('INSP-04', 'BATCH-04'), ('fixture', 'display'))
 board('BATCH-02', 'Batch and rename', 'Rename token expansion and collision preview',
-      'src/ui_logic.rs src/main.rs tests/unit/ui_logic.rs specs/013-image-tools-magick-cache/spec.md',
+      'src/ui_logic.rs src/main.rs tests/unit/ui_logic.rs docs/PROJECT-HISTORY.md',
       'expand_rename_pattern expand_one_rename_token replace_counter tools_refresh_rename_preview',
       'cargo test --test unit_ui_logic expand_rename -- --nocapture;cargo test --test perf_sc_timing sc007 -- --nocapture',
       'Original/ext/counter/date tokens|Deterministic input order and counter padding',
@@ -399,7 +399,7 @@ board('BATCH-02', 'Batch and rename', 'Rename token expansion and collision prev
       'Preview rejects invalid/colliding plans before writes and matches exact eventual target names.',
       'Measure preview for 500 and larger lists without a per-frame filesystem scan.', ('BATCH-03',))
 board('BATCH-03', 'Batch and rename', 'Rename execution and rollback safety',
-      'src/ui_logic.rs src/main.rs tests/integration/image_tools.rs specs/013-image-tools-magick-cache/spec.md',
+      'src/ui_logic.rs src/main.rs tests/integration/image_tools.rs docs/PROJECT-HISTORY.md',
       'apply_rename_pairs tools_apply_rename RenameApplyOutcome',
       'cargo test --test integration_image_tools rename_apply_rolls_back -- --nocapture',
       'Successful multi-file rename|Inventory names update after success',
@@ -407,7 +407,7 @@ board('BATCH-03', 'Batch and rename', 'Rename execution and rollback safety',
       'No unrelated file loss; partial and rollback outcomes identify exact remaining filesystem state.',
       'Measure rename/rollback work separately; collision prevention must remain intact.', ('BATCH-02', 'BATCH-04'))
 board('BATCH-04', 'Batch and rename', 'Processed assets, summaries and inventory integration',
-      'src/ui_logic.rs src/main.rs src/types.rs tests/unit/ui_logic.rs specs/013-image-tools-magick-cache/spec.md',
+      'src/ui_logic.rs src/main.rs src/types.rs tests/unit/ui_logic.rs docs/PROJECT-HISTORY.md',
       'add_or_update_asset_in_inventory refresh_entry_and_inventory aggregate_batch_results tools_on_processed',
       'cargo test --test unit_ui_logic aggregate_batch_results_counts -- --nocapture;cargo test --test unit_ui_logic inventory_add_processed -- --nocapture',
       'New outputs appear once|Summary matches actual successes/failures',
@@ -425,7 +425,7 @@ board('CACHE-01', 'Cache and prepared viewing', 'Cache readiness, configuration 
       'Measure readiness probe frequency and avoid expensive checks on each frame.',
       ('CAP-01', 'CACHE-02'), ('isolated-cache', 'magick-cache'))
 board('CACHE-02', 'Cache and prepared viewing', 'Cache identity, freshness and hit/miss correctness',
-      'src/image_proc.rs tests/unit/image_proc.rs tests/integration/image_tools.rs specs/013-image-tools-magick-cache/spec.md',
+      'src/image_proc.rs tests/unit/image_proc.rs tests/integration/image_tools.rs docs/PROJECT-HISTORY.md',
       'make_iri op_params_key process_single cache_put cache_get',
       'cargo test --test unit_image_proc -- --nocapture;cargo test --test integration_image_tools cache_repeat -- --list',
       'Same source/parameters may hit|Changed operation parameters must not share result',
@@ -434,7 +434,7 @@ board('CACHE-02', 'Cache and prepared viewing', 'Cache identity, freshness and h
       'Compare cold/warm runs with asserted hits and identical output validation, not only elapsed time.',
       ('IMAGE-03', 'CACHE-03'), ('isolated-cache', 'magick-cache'))
 board('CACHE-03', 'Cache and prepared viewing', 'Cache-hit output policy and backup preservation',
-      'src/image_proc.rs src/ui_logic.rs specs/013-image-tools-magick-cache/spec.md',
+      'src/image_proc.rs src/ui_logic.rs docs/PROJECT-HISTORY.md',
       'process_single create_backup compute_output_path',
       'cargo test --test integration_image_tools sc005 -- --nocapture;cargo test --test integration_image_tools cache_repeat -- --list',
       'Cache hit under safe new-file policy|Cache miss under in-place-with-backup policy',
@@ -443,7 +443,7 @@ board('CACHE-03', 'Cache and prepared viewing', 'Cache-hit output policy and bac
       'Measure only after safety parity is proven; no speed target can bypass backup.',
       ('ACT-03', 'CACHE-02'), ('isolated-cache', 'magick-cache', 'fake-executable'))
 board('CACHE-04', 'Cache and prepared viewing', 'Precache jobs, progress and cancellation',
-      'src/image_proc.rs src/main.rs specs/013-image-tools-magick-cache/spec.md',
+      'src/image_proc.rs src/main.rs docs/PROJECT-HISTORY.md',
       'pre_cache_one pre_cache_paths tools_start_precache_job poll_precache_job_rx',
       'cargo test --test integration_image_tools -- --list',
       'Precache snapshot completes with accurate count|Browsing stays responsive',
@@ -452,7 +452,7 @@ board('CACHE-04', 'Cache and prepared viewing', 'Precache jobs, progress and can
       'Measure per-image overhead, progress cadence and cancellation latency.',
       ('BATCH-01', 'CACHE-01'), ('isolated-cache', 'magick-cache', 'display'))
 board('CACHE-05', 'Cache and prepared viewing', 'Prepare-fast materialization, launch and cleanup',
-      'src/image_proc.rs src/main.rs src/ui_logic.rs specs/013-image-tools-magick-cache/spec.md',
+      'src/image_proc.rs src/main.rs src/ui_logic.rs docs/PROJECT-HISTORY.md',
       'prepare_fast_one prepare_fast_set tools_finish_prepare_fast open_feh_on_prepared_fast',
       'cargo test --test integration_image_tools prepare_fast_set -- --nocapture;cargo test --test perf_sc_timing sc004 -- --nocapture',
       'Real optimized files are usable and listed|Viewer receives materialized paths',
@@ -462,7 +462,7 @@ board('CACHE-05', 'Cache and prepared viewing', 'Prepare-fast materialization, l
       ('LIFE-01', 'VIEW-05', 'BATCH-04'), ('magick', 'feh', 'display'))
 
 board('CAP-01', 'Capabilities and feedback', 'Tool detection, recheck and mid-session loss',
-      'src/tool_caps.rs src/main.rs specs/009-external-tool-runtime/spec.md',
+      'src/tool_caps.rs src/main.rs docs/PROJECT-HISTORY.md',
       'detect refresh_tool_caps mark_feh_unavailable feh_spawn_unavailable',
       'cargo test --lib tool_caps::tests -- --nocapture',
       'Tool absent then present after recheck|Healthy recheck restores controls',
@@ -471,7 +471,7 @@ board('CAP-01', 'Capabilities and feedback', 'Tool detection, recheck and mid-se
       'Measure detection process count and latency; no repeated full detection on idle frames.',
       ('INSP-02', 'VIEW-01'), ('fake-executable',))
 board('CAP-02', 'Capabilities and feedback', 'Format routes and advertised processing capability',
-      'src/tool_caps.rs src/image_proc.rs src/scanner.rs docs/POSITIONING.md specs/008-tool-capabilities-panel/spec.md',
+      'src/tool_caps.rs src/image_proc.rs src/scanner.rs docs/PROJECT-HISTORY.md docs/PROJECT-HISTORY.md',
       'format_routes Handler SpeedTier has_external_magick',
       'cargo test --lib format_routes -- --nocapture',
       'Common-format native route|Optional exotic route with external tool',
@@ -479,7 +479,7 @@ board('CAP-02', 'Capabilities and feedback', 'Format routes and advertised proce
       'Discovery, stage decoding, processing and viewer support are distinguished accurately; unsupported claims become documentation findings.',
       'Measure capability-render overhead and ensure route hints are not mistaken for benchmarks.', ('SCAN-04', 'IMAGE-03'))
 board('CAP-03', 'Capabilities and feedback', 'Dependency guidance and format UI',
-      'src/main.rs src/tool_caps.rs specs/008-tool-capabilities-panel/spec.md specs/012-ui-feedback-polish/spec.md',
+      'src/main.rs src/tool_caps.rs docs/PROJECT-HISTORY.md docs/PROJECT-HISTORY.md',
       'render_dependency_row render_format_discovery_body dependencies operation_timings',
       'cargo test --lib dependencies_ -- --nocapture;cargo test --lib operation_timings -- --nocapture',
       'Missing required tool exposes guidance|Install/copy/recheck controls discoverable',
@@ -487,7 +487,7 @@ board('CAP-03', 'Capabilities and feedback', 'Dependency guidance and format UI'
       'Hints, required/optional distinctions and enabled actions agree with runtime capability snapshot.',
       'Measure expensive checks during rendering and duplicate guidance updates.', ('CAP-01', 'INSP-03'), ('display',))
 board('OBS-01', 'Capabilities and feedback', 'Progress, status precedence and busy repaint',
-      'src/main.rs src/ui_logic.rs specs/012-ui-feedback-polish/spec.md',
+      'src/main.rs src/ui_logic.rs docs/PROJECT-HISTORY.md',
       'is_activity_busy request_repaint_if_busy post_scan_status render_session_status_body',
       'cargo test --lib post_scan_ -- --nocapture;cargo test --test feature_001_validation v3_status -- --nocapture',
       'Scan/job progress appears and clears|Required dependency warning survives successful load',
@@ -495,7 +495,7 @@ board('OBS-01', 'Capabilities and feedback', 'Progress, status precedence and bu
       'Status does not report stale success or permanent busy state; important errors remain actionable.',
       'Measure idle/busy CPU, repaint cadence and status latency.', ('INSP-02', 'BATCH-01'), ('display',))
 board('OBS-02', 'Capabilities and feedback', 'Activity log retention, copy and error fidelity',
-      'src/main.rs src/ui_logic.rs specs/011-browsing-experience-round/spec.md',
+      'src/main.rs src/ui_logic.rs docs/PROJECT-HISTORY.md',
       'log join_activity_log render_activity_log_body status_text_for_copy',
       'cargo test --lib join_activity_log -- --nocapture;cargo test --lib format_action_outcome -- --nocapture',
       'Actions and warnings preserve paths/reasons|Copy log/status matches visible source',
@@ -528,7 +528,7 @@ board('VERIFY-03', 'Verification infrastructure', 'Build, CI and packaging verif
       'Separate baseline failures from regressions; no unrelated formatting rewrite or dependency upgrades to make gates appear green.',
       'Measure build/release size only on matching revision/profile and report reproducibility limits.', ('VERIFY-01',))
 board('VERIFY-04', 'Verification infrastructure', 'Requirement and source coverage reconciliation',
-      'README.md docs/POSITIONING.md .agents/BACKLOG.md .agents/BOARD.md .specify/feature.json src/lib.rs',
+      'README.md docs/PROJECT-HISTORY.md .agents/BACKLOG.md .agents/BOARD.md .specify/feature.json src/lib.rs',
       'scanner image_proc tool_caps types ui_logic',
       'git ls-files;cargo test -- --list',
       'Each active entry point/helper has one primary board|Specs 002/004 map to successor behavior',

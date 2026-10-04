@@ -1,5 +1,7 @@
 # rust-feh — Cline hardening boards
 
+> Historical campaign snapshot: its generated Cline manifest and board roots reflect a separate checkout and do not define current UX requirements or current repository status. Use docs/UI-UX-REDESIGN.md for active product/UX authority and docs/PROJECT-HISTORY.md for shipped outcomes. Do not regenerate external boards from this checkout.
+
 Task status lives in Cline; this is generated navigation, not a status board.
 
 Baseline: `6c1823abe2f3835f7d74f630357e6610e9a3ac4b`. All cards explicitly select Cline / openai-codex / gpt-6-luna.

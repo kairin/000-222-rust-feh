@@ -4,7 +4,7 @@
 use crate::types::{
     ActionKind, ActionOutcome, ActionPrefs, ActionResult, AssetStatus, ContextAction,
     FehLaunchEntry, FehLaunchList, FileStatus, ImageEntry, ListViewMode, OutputPolicy,
-    ProcessedResult, ScanInventory, SortMode, WindowPreferences, WindowSizePreset,
+    ProcessedResult, ScanInventory, SortMode, StageState, WindowPreferences, WindowSizePreset,
 };
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::io::Write;
@@ -642,6 +642,30 @@ pub fn list_indices(
     indices
 }
 
+pub fn stage_preview_status(state: &StageState, selected_name: Option<&str>) -> String {
+    match state {
+        StageState::Idle => "Select an image to preview".to_owned(),
+        StageState::Loading => "Loading…".to_owned(),
+        StageState::Failed { reason } => match selected_name {
+            Some(name) => format!("Cannot preview {name}: {reason}"),
+            None => format!("Preview unavailable: {reason}"),
+        },
+        StageState::Ready { width, height } => format!("{width}×{height}"),
+    }
+}
+
+/// Whether the three image-pipeline actions (resize, convert, copy image) can
+/// run on the current selection. Inventory classifies formats; only the
+/// asynchronous preview decode establishes that the selected original is
+/// readable by this process.
+pub fn process_actions_enabled_for_selection(
+    selected: Option<&Path>,
+    decoded: Option<&Path>,
+    preview: &StageState,
+) -> bool {
+    selected.is_some() && selected == decoded && matches!(preview, StageState::Ready { .. })
+}
+
 pub fn showing_count_label(shown: usize, total: usize) -> String {
     format!("Showing {shown} / {total} images")
 }
@@ -658,22 +682,6 @@ pub fn file_status_label(status: FileStatus) -> &'static str {
         FileStatus::NativeListed => "native",
         FileStatus::MagickDetected => "magick · awaiting convert",
         FileStatus::Converted => "converted",
-    }
-}
-
-/// Whether this app's own Rust decode/process pipeline can open and process a
-/// listed file. `MagickDetected` rows were only magic-byte-sniffed by ImageMagick
-/// and not yet converted into a format the `image` crate understands ("awaiting
-/// convert"), so they are not decodable/processable here — only `NativeListed`
-/// and `Converted` are. Mirrors the stage's `StageState::Ready` gate for list rows.
-pub fn file_status_decodable(status: FileStatus) -> bool {
-    matches!(status, FileStatus::NativeListed | FileStatus::Converted)
-}
-
-pub fn tree_file_glyph(status: FileStatus) -> &'static str {
-    match status {
-        FileStatus::MagickDetected => "○",
-        _ => "●",
     }
 }
 
@@ -850,7 +858,7 @@ pub fn folder_line_suffix(listed: usize, magick: usize, skipped: usize) -> Strin
     if skipped > 0 {
         parts.push(format!("{skipped} skipped"));
     }
-    parts.join(" │ ")
+    parts.join(" | ")
 }
 
 fn flatten_tree_node(
@@ -1611,9 +1619,8 @@ pub fn stage_decode_bounds(w: u32, h: u32, max_edge: u32) -> (u32, u32) {
     (new_w, new_h)
 }
 
-/// Inspector section identifiers (018 Batch 1), in the order they render in
-/// `render_inspector_panel`. Replaces 7 discrete open-bool fields with a
-/// single `HashSet<InspectorSection>` fold-state set on `RustFehApp`.
+/// Existing tool-window identifiers used by the on-demand Tools menu and
+/// detached-window dispatcher.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum InspectorSection {
     Browse,
@@ -1626,9 +1633,7 @@ pub enum InspectorSection {
 }
 
 impl InspectorSection {
-    /// All sections, in render order. Iterate this (never a `HashMap`/`HashSet`)
-    /// whenever section ORDER matters (e.g. detached-window spawn order in a
-    /// later batch) — set iteration order is not guaranteed.
+    /// Deterministic dispatch order for visible tool windows.
     pub const ALL: [InspectorSection; 7] = [
         InspectorSection::Browse,
         InspectorSection::ImageActions,
@@ -1638,156 +1643,6 @@ impl InspectorSection {
         InspectorSection::Dependencies,
         InspectorSection::FormatDiscovery,
     ];
-}
-
-/// Initial fold-state at app startup: every section starts COLLAPSED except the
-/// two conditional-open ones — Dependencies when a required tool is missing,
-/// FormatDiscovery when the format-routing tools panel is not fully OK.
-pub fn initial_open_sections(
-    has_missing_required: bool,
-    tools_panel_ok: bool,
-) -> HashSet<InspectorSection> {
-    let mut open = HashSet::new();
-    if has_missing_required {
-        open.insert(InspectorSection::Dependencies);
-    }
-    if !tools_panel_ok {
-        open.insert(InspectorSection::FormatDiscovery);
-    }
-    open
-}
-
-/// Height of the Zone D drawer's inner scroll body when expanded (018 Batch 2;
-/// pure math extracted for FIX-8 unit testing). 40% of the full inspector
-/// content height, clamped so the drawer never starves Zone C nor grows
-/// unbounded.
-pub fn sections_drawer_body_height(full_h: f32) -> f32 {
-    (full_h * 0.4).clamp(180.0, 360.0)
-}
-
-/// The Zone D meta-drawer toggle row height (the "▶ Details" line).
-pub const DRAWER_TOGGLE_ROW_H: f32 = 24.0;
-
-/// Total vertical space Zone D reserves from Zone C (018 Batch 2; pure math
-/// extracted for FIX-8 unit testing). Collapsed = just the toggle row; expanded
-/// = toggle row plus the bounded scroll body.
-pub fn sections_drawer_reserved_height(full_h: f32, collapsed: bool) -> f32 {
-    if collapsed {
-        DRAWER_TOGGLE_ROW_H
-    } else {
-        DRAWER_TOGGLE_ROW_H + sections_drawer_body_height(full_h)
-    }
-}
-
-/// Edge-triggered auto-expand policy for the inspector fold state (018 FIX-1,
-/// FR-003). Pure and egui-free so the whole "rising edge opens once / falling
-/// edge retracts / user-close latch" contract is unit-testable in isolation.
-///
-/// The three triggers (scan active → Session status, no folder → Browse,
-/// missing tool → Dependencies) are each an independent SCOPE. Within a scope
-/// the machine opens the target section ONCE on the rising edge and retracts it
-/// on the falling edge; a manual user close latches suppression so the machine
-/// does not fight the user for the rest of that scope; a manual user open makes
-/// the section user-owned so retraction leaves it in place. The shared Zone D
-/// drawer is reference-counted through `auto_open`: it re-collapses only when the
-/// machine no longer keeps any section open AND the user has not taken the drawer
-/// over.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct AutoExpandState {
-    /// Sections the machine opened and still owns (the only retraction targets).
-    pub auto_open: HashSet<InspectorSection>,
-    /// Sections the user manually closed during the current scope; the machine
-    /// will not re-open them until `begin_scope` lifts the latch.
-    pub suppressed: HashSet<InspectorSection>,
-    /// True when the machine un-collapsed the drawer and the user has not toggled
-    /// it since — lets the last retraction re-collapse it (SC-001 / US1-AS2).
-    pub drawer_auto_opened: bool,
-}
-
-impl AutoExpandState {
-    /// Seed machine ownership from the startup fold set (`initial_open_sections`)
-    /// so startup auto-opens retract through the same mechanism. The drawer is
-    /// NOT claimed here (startup keeps it collapsed — FR-003 "startup semantics
-    /// unchanged").
-    pub fn seeded(initial_open: &HashSet<InspectorSection>) -> Self {
-        AutoExpandState {
-            auto_open: initial_open.clone(),
-            suppressed: HashSet::new(),
-            drawer_auto_opened: false,
-        }
-    }
-
-    /// A new trigger scope for `section` begins (new scan attempt, new no-folder
-    /// episode, or fresh tool-missing detection): the previous scope's user-close
-    /// suppression no longer applies.
-    pub fn begin_scope(&mut self, section: InspectorSection) {
-        self.suppressed.remove(&section);
-    }
-
-    /// Rising-edge request: the machine wants `section` open. No-op if the user
-    /// suppressed it this scope. Claims machine ownership of any section it newly
-    /// opens, and un-collapses the drawer for an active trigger (US1-AS3
-    /// "expanding the drawer"), recording drawer ownership only when it actually
-    /// moves the drawer.
-    pub fn request_open(
-        &mut self,
-        section: InspectorSection,
-        open: &mut HashSet<InspectorSection>,
-        drawer_collapsed: &mut bool,
-    ) {
-        if self.suppressed.contains(&section) {
-            return;
-        }
-        if open.insert(section) {
-            self.auto_open.insert(section);
-        }
-        if *drawer_collapsed {
-            *drawer_collapsed = false;
-            self.drawer_auto_opened = true;
-        }
-    }
-
-    /// Falling-edge retraction: close `section` only if the machine still owns it
-    /// (a user-opened section is preserved). When no machine-owned section remains
-    /// open, release drawer ownership; if the machine owned the drawer and nothing
-    /// else is open, re-collapse it.
-    pub fn retract(
-        &mut self,
-        section: InspectorSection,
-        open: &mut HashSet<InspectorSection>,
-        drawer_collapsed: &mut bool,
-    ) {
-        self.suppressed.remove(&section);
-        if self.auto_open.remove(&section) {
-            open.remove(&section);
-        }
-        if self.auto_open.is_empty() {
-            if self.drawer_auto_opened && open.is_empty() {
-                *drawer_collapsed = true;
-            }
-            self.drawer_auto_opened = false;
-        }
-    }
-
-    /// The user manually closed `section`: drop machine ownership and latch
-    /// suppression so the machine will not re-open it this scope (FR-003).
-    pub fn note_user_close(&mut self, section: InspectorSection) {
-        self.auto_open.remove(&section);
-        self.suppressed.insert(section);
-    }
-
-    /// The user manually opened `section`: it becomes user-owned (removed from
-    /// machine ownership and un-suppressed), so a later retraction leaves it open.
-    pub fn note_user_open(&mut self, section: InspectorSection) {
-        self.auto_open.remove(&section);
-        self.suppressed.remove(&section);
-    }
-
-    /// The user toggled the drawer itself: they now own its open/closed state, so
-    /// a later retraction must not move it.
-    pub fn note_user_drawer_toggle(&mut self) {
-        self.drawer_auto_opened = false;
-    }
 }
 
 /// A pinnable target for a detached inspector panel (018 decision 4). Only one
@@ -2260,13 +2115,6 @@ mod tests {
             "magick · awaiting convert"
         );
         assert_eq!(file_status_label(FileStatus::Converted), "converted");
-    }
-
-    #[test]
-    fn file_status_decodable_matches_native_and_converted_only() {
-        assert!(file_status_decodable(FileStatus::NativeListed));
-        assert!(file_status_decodable(FileStatus::Converted));
-        assert!(!file_status_decodable(FileStatus::MagickDetected));
     }
 
     #[test]
@@ -3231,139 +3079,5 @@ mod tests {
         );
     }
 
-    // --- Zone D drawer height math (018 FIX-8) ---
 
-    #[test]
-    fn sections_drawer_body_height_clamps_to_180_360() {
-        assert_eq!(sections_drawer_body_height(100.0), 180.0); // 40 → floor
-        assert_eq!(sections_drawer_body_height(1000.0), 360.0); // 400 → ceil
-        assert_eq!(sections_drawer_body_height(600.0), 240.0); // in range
-    }
-
-    #[test]
-    fn sections_drawer_reserved_height_collapsed_vs_expanded() {
-        assert_eq!(
-            sections_drawer_reserved_height(600.0, true),
-            DRAWER_TOGGLE_ROW_H
-        );
-        assert_eq!(
-            sections_drawer_reserved_height(600.0, false),
-            DRAWER_TOGGLE_ROW_H + 240.0
-        );
-    }
-
-    // --- AutoExpandState edge/latch policy (018 FIX-1, FR-003) ---
-
-    #[test]
-    fn auto_expand_rising_edge_inserts_once() {
-        let mut st = AutoExpandState::default();
-        let mut open = HashSet::new();
-        let mut collapsed = true;
-        st.request_open(InspectorSection::SessionStatus, &mut open, &mut collapsed);
-        assert!(open.contains(&InspectorSection::SessionStatus));
-        assert!(!collapsed, "rising edge un-collapses the drawer");
-        assert!(st.drawer_auto_opened);
-        // Idempotent: a second request in the same scope changes nothing.
-        st.request_open(InspectorSection::SessionStatus, &mut open, &mut collapsed);
-        assert_eq!(open.len(), 1);
-        assert_eq!(st.auto_open.len(), 1);
-    }
-
-    #[test]
-    fn auto_expand_falling_edge_retracts_auto_inserted_only() {
-        let mut st = AutoExpandState::default();
-        let mut open = HashSet::new();
-        let mut collapsed = true;
-        st.request_open(InspectorSection::SessionStatus, &mut open, &mut collapsed);
-        // A separately, user-opened section (not machine-owned).
-        open.insert(InspectorSection::ActivityLog);
-        st.retract(InspectorSection::SessionStatus, &mut open, &mut collapsed);
-        assert!(
-            !open.contains(&InspectorSection::SessionStatus),
-            "auto section retracted"
-        );
-        assert!(
-            open.contains(&InspectorSection::ActivityLog),
-            "user section preserved"
-        );
-        assert!(!collapsed, "drawer stays open while any section is open");
-    }
-
-    #[test]
-    fn auto_expand_user_close_suppresses_reopen_within_scope() {
-        let mut st = AutoExpandState::default();
-        let mut open = HashSet::new();
-        let mut collapsed = true;
-        st.request_open(InspectorSection::SessionStatus, &mut open, &mut collapsed);
-        // User closes it (the header toggle removes from `open` and latches).
-        open.remove(&InspectorSection::SessionStatus);
-        st.note_user_close(InspectorSection::SessionStatus);
-        // Machine re-asserts in the same scope → suppressed, stays closed.
-        st.request_open(InspectorSection::SessionStatus, &mut open, &mut collapsed);
-        assert!(!open.contains(&InspectorSection::SessionStatus));
-        // A new scope lifts the latch.
-        st.begin_scope(InspectorSection::SessionStatus);
-        st.request_open(InspectorSection::SessionStatus, &mut open, &mut collapsed);
-        assert!(open.contains(&InspectorSection::SessionStatus));
-    }
-
-    #[test]
-    fn auto_expand_user_open_preserved_on_retraction() {
-        let mut st = AutoExpandState::default();
-        let mut open = HashSet::new();
-        // Drawer already open by the user; user manually opens a section
-        // (user-owned, never machine-owned).
-        let mut collapsed = false;
-        open.insert(InspectorSection::SessionStatus);
-        st.note_user_open(InspectorSection::SessionStatus);
-        // A trigger's falling edge fires.
-        st.retract(InspectorSection::SessionStatus, &mut open, &mut collapsed);
-        assert!(
-            open.contains(&InspectorSection::SessionStatus),
-            "user-open survives retraction"
-        );
-    }
-
-    #[test]
-    fn auto_expand_drawer_recollapses_after_last_retraction() {
-        // SC-001 / US1-AS2: scan opens the drawer, completion returns it to collapsed.
-        let mut st = AutoExpandState::default();
-        let mut open = HashSet::new();
-        let mut collapsed = true;
-        st.request_open(InspectorSection::SessionStatus, &mut open, &mut collapsed);
-        assert!(!collapsed);
-        st.retract(InspectorSection::SessionStatus, &mut open, &mut collapsed);
-        assert!(open.is_empty());
-        assert!(collapsed, "drawer returns to collapsed");
-        assert!(!st.drawer_auto_opened);
-    }
-
-    #[test]
-    fn auto_expand_user_drawer_toggle_blocks_recollapse() {
-        let mut st = AutoExpandState::default();
-        let mut open = HashSet::new();
-        let mut collapsed = true;
-        st.request_open(InspectorSection::SessionStatus, &mut open, &mut collapsed);
-        st.note_user_drawer_toggle(); // user takes drawer ownership
-        st.retract(InspectorSection::SessionStatus, &mut open, &mut collapsed);
-        assert!(!open.contains(&InspectorSection::SessionStatus));
-        assert!(!collapsed, "drawer stays as the user left it");
-    }
-
-    #[test]
-    fn auto_expand_seeded_owns_startup_open_sections() {
-        let initial = initial_open_sections(true, true); // Dependencies open at startup
-        let st = AutoExpandState::seeded(&initial);
-        assert!(st.auto_open.contains(&InspectorSection::Dependencies));
-        assert!(!st.drawer_auto_opened, "startup keeps the drawer collapsed");
-    }
-
-    #[test]
-    fn initial_open_sections_semantics_unchanged() {
-        assert!(initial_open_sections(false, true).is_empty());
-        assert!(initial_open_sections(true, true).contains(&InspectorSection::Dependencies));
-        assert!(initial_open_sections(false, false).contains(&InspectorSection::FormatDiscovery));
-        // Browse is NEVER auto-opened at startup by this fn (edge machine owns that).
-        assert!(!initial_open_sections(true, false).contains(&InspectorSection::Browse));
-    }
 }

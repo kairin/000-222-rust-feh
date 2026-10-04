@@ -16,7 +16,7 @@ class-A AND class-B work alike. Every agent reads this file plus its task file b
    `tool_caps` stay egui-independent (re-exported by lib.rs). GUI never leaks into core;
    core never depends on GUI types. Async/threading extracted from GUI when introduced.
 4. **Linux-First, feh-Centric** — feh detected or installable; graceful degradation with a
-   clear status message when missing. Wallpaper = `feh --bg-fill` only. ImageMagick optional,
+   clear status message when missing. Wallpaper support is outside rust-feh scope. ImageMagick optional,
    enhancement-only; the `image` crate is the always-available processor.
 5. **Performance Awareness** — walkdir with symlink-follow disabled; metadata lazy; never read
    full image data during listing; UI responsive during scans.

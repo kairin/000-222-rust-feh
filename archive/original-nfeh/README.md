@@ -1,7 +1,7 @@
 # WARNING!
 ## As it stands, this is abandonware. Use at your own risk! I don't get nearly enough time to maintain this.
 
-> **Successor:** This tree is archived. Active development continues as **rust-feh** in the repo root. See [docs/NFEH-COMPARISON-AND-MIGRATION.md](../../docs/NFEH-COMPARISON-AND-MIGRATION.md) for how features and tools (feh, wallpaper, formats) compare.
+> **Successor:** This tree is archived. Active development continues as **rust-feh** in the repo root. See the [current product and UX requirements](../../docs/UI-UX-REDESIGN.md) and [project history](../../docs/PROJECT-HISTORY.md).
 
 # nfeh
 

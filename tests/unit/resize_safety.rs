@@ -1,9 +1,7 @@
 use super::*;
 use std::fs;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Mutex, MutexGuard};
-
-static PATH_LOCK: Mutex<()> = Mutex::new(());
+use std::sync::MutexGuard;
 
 struct Fixture {
     dir: PathBuf,
@@ -14,7 +12,7 @@ struct Fixture {
 impl Fixture {
     fn new() -> Self {
         static NEXT: AtomicUsize = AtomicUsize::new(0);
-        let path_lock = PATH_LOCK.lock().unwrap();
+        let path_lock = crate::test_support::PATH_LOCK.lock().unwrap();
         let dir = std::env::temp_dir().join(format!(
             "resize-safety-{}-{}", std::process::id(), NEXT.fetch_add(1, Ordering::Relaxed)
         ));

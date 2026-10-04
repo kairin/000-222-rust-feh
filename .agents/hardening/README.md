@@ -1,14 +1,18 @@
 # Cline / Luna implementation hardening
 
+> Historical campaign snapshot: its generated Cline manifest and board roots reflect a separate checkout and do not define current UX requirements or current repository status. Use docs/UI-UX-REDESIGN.md for active product/UX authority and docs/PROJECT-HISTORY.md for shipped outcomes. Do not regenerate external boards from this checkout.
+
 Approved by the maintainer on 2026-09-27. This campaign reviews existing rust-feh
 behavior; it does not authorize new features, product edits, publishing, or agents
 starting other agents merely because a board exists.
 
 ## Authority and boundaries
 
-- Cline kanban is the campaign task-status source of truth. Specs remain behavioral
-  contracts. This directory holds the inventory, task definitions, and evidence
-  references, not a competing live task-status board.
+- Cline kanban is the campaign task-status source of truth. Its generated cards describe
+  source/test coverage for pinned baseline `6c1823a`; old feature-spec checks are historical
+  baseline criteria, not current layout requirements. Current product/UX authority is
+  `docs/UI-UX-REDESIGN.md`; shipped outcomes and evidence are in `docs/PROJECT-HISTORY.md`.
+  This directory holds campaign inventory and evidence references, not product requirements.
 - Campaign workers use **Cline / openai-codex / gpt-6-luna**, explicitly pinned per
   card. This maintainer-selected routing replaces the historical Haiku/Sonnet/Opus
   dispatch roles for this campaign only; all architectural, safety, and publishing

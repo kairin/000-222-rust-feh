@@ -5,7 +5,7 @@ _Verified 2026-07-05 by lead architect. Re-verify before relying on anything tim
 ## Repo
 - Remote: `origin = https://github.com/kairin/rust-feh.git` (verified `git remote -v`)
 - Default branch: `main`. CI (workflow `CI`) green on main; 0 open PRs at engagement start; 1 open issue (#35 — nfeh CVE rationale, kept open intentionally as audit trail).
-- `.specify/feature.json` → `specs/006-window-viewer-stability`.
+- `.specify/feature.json` → `specs/016-feh-viewer-actions`.
 
 ## Spec Kit
 - `specify --version` → **0.12.4** (matches `.specify/init-options.json` after upgrade commit).
@@ -42,7 +42,7 @@ _Verified 2026-07-05 by lead architect. Re-verify before relying on anything tim
   `src/scanner.rs:330` (manual venice-folder timing).
 - `cargo build --release`: pass.
 - `cargo fmt --check` / `cargo clippy`: **components not installed locally** (no rustup on
-  PATH — matches NEXT-ROUND E1). Canonical fmt/clippy gates run in CI; CI green on main
+  PATH — matches the historical environment note). Canonical fmt/clippy gates run in CI; CI green on main
   (last run: PR #145 merge, pass, plus Codacy pass).
 - GUI environment: GNOME Wayland; app runs native Wayland by default; forced XWayland via
   `env -u WAYLAND_DISPLAY` for `import`/`xwininfo` capture. Synthetic input (XTEST) is NOT

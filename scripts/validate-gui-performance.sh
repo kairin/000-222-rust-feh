@@ -19,10 +19,10 @@ echo "Run: FIXTURE=\$(./scripts/generate-perf-fixture.sh 10000)"
 echo ""
 
 echo "--- Step 3: Manual GUI protocol ---"
-echo "See: specs/003-gui-performance-validation/quickstart.md"
+echo "See: docs/UI-UX-REDESIGN.md (Sections 6 U0/U4)"
 echo "  - V1 layout spot check"
-echo "  - V2 scroll 5s (SC-002)"
-echo "  - RSS samples: ./scripts/sample-rss.sh (SC-004, peak <150MB)"
+echo "  - same-build, same-fixture rapid-scroll interaction; report observations without invented numeric threshold"
+echo "  - RSS samples: ./scripts/sample-rss.sh; compare with inherited <150MB target when reproducible"
 echo ""
 
 if [[ ! -f "$RESULTS" ]]; then
@@ -61,10 +61,10 @@ if [[ ! -f "$RESULTS" ]]; then
 
 ## Notes
 
-Complete manual steps in quickstart.md, then fill this file.
+Complete the manual protocol in active UX plan U4, then fill this file.
 EOF
   echo "Created stub: $RESULTS"
 fi
 
 echo ""
-echo "=== Automated tier passed. Complete manual steps in quickstart.md ==="
+echo "=== Automated tier passed. Complete the manual protocol in active UX plan U4 ==="

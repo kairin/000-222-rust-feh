@@ -150,7 +150,7 @@ impl ToolCapabilities {
                 name: "ImageMagick",
                 binaries: &["magick", "convert"],
                 kind: DepKind::Optional,
-                role: "Magick-detect unlisted formats (convert not implemented)",
+                role: "Identify unlisted formats and convert images through Image Tools",
                 install_cmd: "sudo apt install imagemagick",
                 installed: self.magick_available,
                 resolved_binary: self.magick_binary.clone(),
@@ -204,7 +204,7 @@ impl ToolCapabilities {
                 operation: "Quick resize (jpg/png/webp)",
                 handler: Handler::ImageCrate,
                 speed: SpeedTier::Medium,
-                note: "Always available; no external deps",
+                note: "Requires a decodable selected image; Image Tools can convert with ImageMagick",
             },
             OperationTiming {
                 operation: "Exotic format view (svg/heic/raw…)",
@@ -215,7 +215,7 @@ impl ToolCapabilities {
                     SpeedTier::Medium
                 },
                 note: if self.magick_available {
-                    "ImageMagick (detection only)"
+                    "Image Tools can process a decodable selection with ImageMagick"
                 } else {
                     "Limited without ImageMagick on PATH"
                 },
@@ -228,7 +228,7 @@ impl ToolCapabilities {
             (
                 Handler::ImageMagick,
                 SpeedTier::Slow,
-                "Magick-detected in inventory; may use ImageMagick (no convert yet)",
+                "ImageMagick identifies unlisted files; Image Tools can convert when available",
             )
         } else {
             (Handler::Feh, SpeedTier::Fast, "Not magick-detected without ImageMagick")
@@ -282,7 +282,7 @@ impl ToolCapabilities {
                     SpeedTier::Instant
                 },
                 note: if self.magick_available {
-                    "Magick-detected (unlisted) in inventory; awaiting processing (not implemented)"
+                    "ImageMagick can process a decodable selection when the format is supported"
                 } else {
                     "Hidden from list/inventory without ImageMagick on PATH"
                 },
@@ -328,15 +328,18 @@ pub fn feh_spawn_unavailable(err: &std::io::Error) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_support::PATH_LOCK;
 
     #[test]
     fn detect_returns_feh_and_magick_fields() {
+        let _path_lock = PATH_LOCK.lock().unwrap();
         let caps = ToolCapabilities::detect();
         let _ = (caps.feh_available, caps.magick_available, caps.magick_cache_available);
     }
 
     #[test]
     fn dependencies_include_feh_and_imagemagick_and_magickcache() {
+        let _path_lock = PATH_LOCK.lock().unwrap();
         let caps = ToolCapabilities::detect();
         let deps = caps.dependencies();
         assert_eq!(deps.len(), 3);
@@ -348,6 +351,7 @@ mod tests {
 
     #[test]
     fn operation_timings_include_browse_and_view() {
+        let _path_lock = PATH_LOCK.lock().unwrap();
         let caps = ToolCapabilities::detect();
         let ops = caps.operation_timings();
         assert!(ops.iter().any(|o| o.operation.contains("Browse")));
@@ -356,6 +360,7 @@ mod tests {
 
     #[test]
     fn format_routes_cover_common_and_exotic() {
+        let _path_lock = PATH_LOCK.lock().unwrap();
         let caps = ToolCapabilities::detect();
         let routes = caps.format_routes();
         assert!(routes[0].extensions.contains("jpg"));
@@ -416,7 +421,7 @@ mod tests {
             .into_iter()
             .find(|r| r.extensions.contains("heic"))
             .expect("heic group");
-        assert!(heic.note.contains("Magick-detected"));
+        assert_eq!(heic.view, Handler::ImageMagick);
     }
 
     #[test]
@@ -436,6 +441,7 @@ mod tests {
     #[test]
     fn feh_spawn_unavailable_requires_path_confirm() {
         use std::io::{Error, ErrorKind};
+        let _path_lock = PATH_LOCK.lock().unwrap();
         let err = Error::new(ErrorKind::NotFound, "feh");
         let missing = super::feh_spawn_unavailable(&err);
         assert_eq!(missing, super::feh_confirmed_missing());
@@ -443,6 +449,7 @@ mod tests {
 
     #[test]
     fn detect_snapshot_matches_path_lookup() {
+        let _path_lock = PATH_LOCK.lock().unwrap();
         let caps = ToolCapabilities::detect();
         assert_eq!(caps.feh_available, which::which("feh").is_ok());
         let magick_on_path =

@@ -18,17 +18,18 @@ use rust_feh::ui_logic::{
     compute_output_path, copy_image_to_clipboard, crop_preview_pixels, default_tree_expanded,
     entry_is_launchable, execute_move_plan, expand_rename_pattern, feh_entry_filelist_path,
     feh_filelist_temp_path, feh_missing_status, feh_not_installed_launch_status, file_name_display,
-    file_status_decodable, file_status_label, finalize_scan_entries_fast, folder_line_suffix,
+    file_status_label, finalize_scan_entries_fast, folder_line_suffix,
     folder_tree_display_name, format_action_outcome, format_image_tools_log, format_inventory_bar,
-    handoff_path, initial_open_sections, inventory_magick_hint, is_network_mount_path,
+    handoff_path, inventory_magick_hint, is_network_mount_path,
     join_activity_log, list_indices, list_subfolders, list_view_mode_label, load_action_prefs,
     load_launch_list, load_window_prefs, merge_converted_statuses, plan_loss_proof_move,
     post_scan_status, prepare_fast_work_dir, relative_folder, save_action_prefs, save_copy_to,
-    save_launch_list, save_window_prefs, scan_magick_enabled, sections_drawer_body_height,
-    sections_drawer_reserved_height, showing_count_label, sort_mode_label, spawn_job,
-    tree_file_glyph, tree_visible_rows, validate_handoff, viewer_profile_dir, viewer_spawn_command,
-    window_preset_dimensions, window_preset_label, write_feh_filelist, write_feh_filelist_to,
-    AutoExpandState, DetachedWindow, EntryLaunchState, InspectorSection, JobMsg, PanelContext,
+    save_launch_list, save_window_prefs, scan_magick_enabled, showing_count_label,
+    sort_mode_label, spawn_job,
+    tree_visible_rows, validate_handoff, viewer_profile_dir, viewer_spawn_command,
+    process_actions_enabled_for_selection, stage_preview_status, window_preset_dimensions,
+    window_preset_label, write_feh_filelist, write_feh_filelist_to,
+    DetachedWindow, EntryLaunchState, InspectorSection, JobMsg, PanelContext,
     PanelPin, TreeRow, TreeRowKind, FEH_VIEWER_GEOMETRY, FEH_VIEWER_ZOOM, WINDOW_MAX_RESIZABLE,
     WINDOW_MIN_RESIZABLE,
 };
@@ -46,8 +47,6 @@ fn create_rust_feh_app(
     status: String,
     feh_available: bool,
     tool_caps: ToolCapabilities,
-    deps_section_open: bool,
-    tools_panel_ok: bool,
 ) -> Box<dyn App> {
     let window_prefs = load_window_prefs();
     // Reap any handoff files orphaned by a prior session's round-trip
@@ -58,8 +57,6 @@ fn create_rust_feh_app(
         status,
         feh_available,
         tool_caps,
-        deps_section_open,
-        tools_panel_ok,
         (window_prefs, load_launch_list(), load_action_prefs()),
     ))
 }
@@ -69,18 +66,12 @@ impl RustFehApp {
         status: String,
         feh_available: bool,
         tool_caps: ToolCapabilities,
-        deps_section_open: bool,
-        tools_panel_ok: bool,
         (window_prefs, launch_entries, action_prefs): (
             WindowPreferences,
             FehLaunchList,
             ActionPrefs,
         ),
     ) -> Self {
-        let initial_open = initial_open_sections(deps_section_open, tools_panel_ok);
-        // Seed the auto-expand machine's ownership from the startup fold set so
-        // startup auto-opens retract through the edge machine (018 FIX-1).
-        let auto_expand = AutoExpandState::seeded(&initial_open);
         Self {
             current_dir: None,
             images: vec![],
@@ -103,6 +94,7 @@ impl RustFehApp {
             prior_window_resizable: window_prefs.resizable,
             window_prefs_applied: false,
             scan_inventory: None,
+            scan_warnings: Vec::new(),
             list_view_mode: ListViewMode::default(),
             tree_expanded_paths: default_tree_expanded(),
             scan_generation: 0,
@@ -115,10 +107,6 @@ impl RustFehApp {
             subfolders_pending: false,
             pending_select_path: None,
             detached: HashMap::new(),
-            inspector_open: initial_open,
-            inspector_drawer_collapsed: true,
-            auto_expand,
-            prior_folder_present: true,
             format_route_open: HashSet::new(),
             start_folder_loaded: false,
             image_tools: ImageToolsService::new(None),
@@ -134,10 +122,10 @@ impl RustFehApp {
             selected_tree_folder: None,
             stage_generation: 0,
             stage_requested_path: None,
-            stage_state: StageState::Loading,
+            stage_state: StageState::default(),
             stage_rx: None,
             stage_texture: None,
-            stage_pane_collapsed: false,
+            compact_preview_open: false,
             action_prefs,
             round_trips: Vec::new(),
             next_viewer_id: 0,
@@ -146,7 +134,6 @@ impl RustFehApp {
             list_index_cache: std::cell::RefCell::new(None),
             tree_rows_cache: Vec::new(),
             tree_rows_cache_key: None,
-            inspector_width_cache: None,
         }
     }
 }
@@ -282,7 +269,7 @@ fn try_run_gui() -> Result<(), String> {
     let (w, h) = window_preset_dimensions(WindowSizePreset::default());
     let (min_w, min_h) = WINDOW_MIN_RESIZABLE;
 
-    let (status, feh_available, tool_caps, deps_section_open, tools_panel_ok) = detect_app_state();
+    let (status, feh_available, tool_caps) = detect_app_state();
 
     let options = build_native_options(w, h, min_w, min_h);
 
@@ -297,8 +284,6 @@ fn try_run_gui() -> Result<(), String> {
                 status_first,
                 feh_available,
                 tool_caps_first,
-                deps_section_open,
-                tools_panel_ok,
             ) as Box<dyn App>)
         }),
     );
@@ -309,30 +294,20 @@ fn try_run_gui() -> Result<(), String> {
             status,
             feh_available,
             tool_caps,
-            deps_section_open,
-            tools_panel_ok,
         );
     }
     Ok(())
 }
 
-fn detect_app_state() -> (String, bool, ToolCapabilities, bool, bool) {
+fn detect_app_state() -> (String, bool, ToolCapabilities) {
     let tool_caps = ToolCapabilities::detect();
     let feh_available = tool_caps.feh_available;
-    let deps_section_open = tool_caps.has_missing_required();
-    let tools_panel_ok = !tool_caps.has_missing_required();
     let status = if feh_available {
         String::new()
     } else {
         "feh not found — install with `sudo apt install feh`".to_string()
     };
-    (
-        status,
-        feh_available,
-        tool_caps,
-        deps_section_open,
-        tools_panel_ok,
-    )
+    (status, feh_available, tool_caps)
 }
 
 fn build_native_options(w: f32, h: f32, min_w: f32, min_h: f32) -> eframe::NativeOptions {
@@ -351,8 +326,6 @@ fn handle_gui_failure(
     status: String,
     feh_available: bool,
     tool_caps: ToolCapabilities,
-    deps_section_open: bool,
-    tools_panel_ok: bool,
 ) -> Result<(), String> {
     eprintln!("[rust-feh] Failed to initialize GUI window: {}", err);
 
@@ -381,8 +354,6 @@ fn handle_gui_failure(
                     status,
                     feh_available,
                     tool_caps,
-                    deps_section_open,
-                    tools_panel_ok,
                 ) as Box<dyn App>)
             }),
         ) {
@@ -446,6 +417,7 @@ struct RustFehApp {
     /// False until the loaded window preferences are applied to the viewport on the first frame.
     window_prefs_applied: bool,
     scan_inventory: Option<ScanInventory>,
+    scan_warnings: Vec<String>,
     list_view_mode: ListViewMode,
     tree_expanded_paths: HashSet<String>,
     scan_generation: u64,
@@ -467,22 +439,6 @@ struct RustFehApp {
     /// 7 discrete `*_detached` bools. Absence = docked; presence = detached.
     /// Carries per-window pin state (018 Batch 5 target pinning).
     detached: HashMap<InspectorSection, DetachedWindow>,
-    /// Per-section fold state (018 Batch 1); replaces 7 discrete open-bools.
-    inspector_open: HashSet<InspectorSection>,
-    /// Zone D meta-drawer fold state (018 Batch 2): true = the 7 detail
-    /// sections are hidden behind the "Details" toggle. Collapsed by default so
-    /// the file list (Zone C) is the primary content on launch.
-    inspector_drawer_collapsed: bool,
-    /// Edge-triggered auto-expand policy state (018 FIX-1, FR-003): tracks which
-    /// sections/drawer the machine opened so it can retract them and honor a
-    /// user-close latch. Drives `inspector_open`/`inspector_drawer_collapsed` at
-    /// scan/no-folder/tool-missing edges instead of the old per-frame inserts.
-    auto_expand: AutoExpandState,
-    /// Previous frame's `current_dir.is_some()`, for edge-detecting the
-    /// no-folder ↔ folder-loaded transitions that drive Browse auto-expand
-    /// (018 FIX-1). Seeded `true` so a first frame with no folder fires the
-    /// no-folder rising edge (Browse opens — SC-001).
-    prior_folder_present: bool,
     image_tools: ImageToolsService,
     cache_config: CacheConfig,
     tools_panel: ImageToolsPanelState,
@@ -503,7 +459,7 @@ struct RustFehApp {
     stage_state: StageState,
     stage_rx: Option<Receiver<StageDecodeMsg>>,
     stage_texture: Option<egui::TextureHandle>,
-    stage_pane_collapsed: bool,
+    compact_preview_open: bool,
     action_prefs: ActionPrefs,
     /// Live round-trip viewers, polled every frame (feature 016, US2).
     round_trips: Vec<ViewerRoundTrip>,
@@ -520,16 +476,6 @@ struct RustFehApp {
     /// Cross-frame cache for the folder-tree rows (reused when `TreeRowsKey` unchanged).
     tree_rows_cache: Vec<TreeRow>,
     tree_rows_cache_key: Option<TreeRowsKey>,
-    /// Cached measured static-label text width for the Inspector (feature 017
-    /// Phase 5; re-clamp semantics fixed in 018 F3):
-    /// (pixels_per_point the text was measured at, measured max text width in px
-    /// — NOT the final clamped panel width, which is recomputed every call from
-    /// the live half-viewport so it never goes stale on resize).
-    /// Recomputed only when `pixels_per_point` changes — the sole input to
-    /// static-label text measurement, since this app never mutates fonts, text
-    /// styles, theme, or zoom. Prevents per-frame re-measurement while keeping
-    /// the final width live.
-    inspector_width_cache: Option<(f32, f32)>,
 }
 
 enum FehEntryAction {
@@ -578,6 +524,8 @@ struct SubfolderMsg {
 
 /// Longest edge (px) for stage-pane decodes (feature 016, R5).
 const STAGE_MAX_EDGE: u32 = 2048;
+const MIN_BROWSER_WIDTH: f32 = 480.0;
+const MIN_PREVIEW_WIDTH: f32 = 220.0;
 
 /// Off-thread stage decode result; stale generations are discarded on receipt.
 enum StageDecodeMsg {
@@ -694,30 +642,6 @@ impl RustFehApp {
     /// (before this runs) leaves `present == prior` and never opens Browse
     /// (maintainer clarification: "folder already set at launch → Browse stays
     /// folded").
-    fn sync_auto_expand_folder_edge(&mut self) {
-        let present = self.current_dir.is_some();
-        if present == self.prior_folder_present {
-            return;
-        }
-        self.prior_folder_present = present;
-        if present {
-            // Folder loaded → falling edge for Browse: retract it.
-            self.auto_expand.retract(
-                InspectorSection::Browse,
-                &mut self.inspector_open,
-                &mut self.inspector_drawer_collapsed,
-            );
-        } else {
-            // No folder → rising edge for Browse (a fresh no-folder scope).
-            self.auto_expand.begin_scope(InspectorSection::Browse);
-            self.auto_expand.request_open(
-                InspectorSection::Browse,
-                &mut self.inspector_open,
-                &mut self.inspector_drawer_collapsed,
-            );
-        }
-    }
-
     fn pick_folder(&mut self) {
         if let Some(dir) = rfd::FileDialog::new().pick_folder() {
             self.log(format!("User chose folder: {}", dir.display()));
@@ -821,7 +745,7 @@ impl RustFehApp {
             ));
             self.selected = Some(path.clone());
             self.status = format!(
-                "Selected: {}. Use Image actions to open in feh, or right-click for Resize/Convert.",
+                "Selected: {}. Use Open in feh or More for actions.",
                 path.display()
             );
             return Some(path);
@@ -915,35 +839,11 @@ impl RustFehApp {
     fn refresh_tool_caps(&mut self) {
         self.tool_caps = ToolCapabilities::detect();
         self.feh_available = self.tool_caps.feh_available;
-        if self.tool_caps.has_missing_required() {
-            // Recheck still finds a missing tool → rising edge (fresh detection
-            // scope) for the tool sections (018 FIX-1/FIX-7).
-            for section in [
-                InspectorSection::Dependencies,
-                InspectorSection::FormatDiscovery,
-            ] {
-                self.auto_expand.begin_scope(section);
-                self.auto_expand.request_open(
-                    section,
-                    &mut self.inspector_open,
-                    &mut self.inspector_drawer_collapsed,
-                );
-            }
+        self.status = if self.tool_caps.has_missing_required() {
+            "Some required tools are missing. Open Tools, then Installed tools to review them.".into()
         } else {
-            // All tools OK → symmetric falling edge: retract BOTH auto-opened
-            // tool sections (018 FIX-7 — previously FormatDiscovery was never
-            // removed on recovery).
-            for section in [
-                InspectorSection::Dependencies,
-                InspectorSection::FormatDiscovery,
-            ] {
-                self.auto_expand.retract(
-                    section,
-                    &mut self.inspector_open,
-                    &mut self.inspector_drawer_collapsed,
-                );
-            }
-        }
+            "Tools rechecked.".into()
+        };
         self.log(format!(
             "Rechecked tools: feh={}, magick={}",
             self.tool_caps.feh_available, self.tool_caps.magick_available
@@ -954,14 +854,6 @@ impl RustFehApp {
         self.feh_available = false;
         self.tool_caps.feh_available = false;
         self.status = feh_missing_status();
-        // Mid-session tool loss is a rising edge (an event) → surface
-        // Dependencies + expand the drawer via the same machine (018 FIX-7).
-        self.auto_expand.begin_scope(InspectorSection::Dependencies);
-        self.auto_expand.request_open(
-            InspectorSection::Dependencies,
-            &mut self.inspector_open,
-            &mut self.inspector_drawer_collapsed,
-        );
         self.log("feh marked unavailable after spawn failure".to_owned());
     }
 
@@ -976,7 +868,7 @@ impl RustFehApp {
         (
             spinner,
             format!(
-                "{} → {} · {} ({})",
+                "{} -> {} | {} ({})",
                 op.operation,
                 op.handler.label(),
                 op.speed.label(),
@@ -1075,28 +967,17 @@ impl RustFehApp {
                     ui.colored_label(color, "Not installed");
                     ui.horizontal(|ui| {
                         ui.monospace(dep.install_cmd);
-                        if ui.small_button(format!("Copy##{}", dep.name)).clicked() {
-                            ctx.copy_text(dep.install_cmd.to_string());
-                            self.status = format!("Copied install command for {}", dep.name);
-                        }
+                        ui.push_id(dep.name, |ui| {
+                            if ui.small_button("Copy").clicked() {
+                                ctx.copy_text(dep.install_cmd.to_string());
+                                self.status = format!("Copied install command for {}", dep.name);
+                            }
+                        });
                     });
                 }
             });
         });
         ui.add_space(4.0);
-    }
-
-    fn toggle_inspector_section(&mut self, section: InspectorSection) {
-        if self.inspector_open.contains(&section) {
-            self.inspector_open.remove(&section);
-            // Manual close latches suppression so the machine will not re-open it
-            // this scope (018 FIX-1 / FR-003).
-            self.auto_expand.note_user_close(section);
-        } else {
-            self.inspector_open.insert(section);
-            // Manual open makes the section user-owned (survives retraction).
-            self.auto_expand.note_user_open(section);
-        }
     }
 
     fn toggle_format_route(&mut self, route_id: &str) {
@@ -1120,96 +1001,6 @@ impl RustFehApp {
         ));
     }
 
-    fn header_with_detach_suffix(label: String, detached: bool) -> String {
-        if detached {
-            format!("{label} — detached")
-        } else {
-            label
-        }
-    }
-
-    fn render_segment_detach_toolbar(ui: &mut egui::Ui, caption: &str, detach_label: &str) -> bool {
-        let mut detach = false;
-        egui::Frame::none()
-            .inner_margin(egui::Margin::symmetric(4.0, 2.0))
-            .stroke(egui::Stroke::new(
-                1.0_f32,
-                ui.style().visuals.widgets.noninteractive.bg_stroke.color,
-            ))
-            .show(ui, |ui| {
-                ui.horizontal(|ui| {
-                    ui.small(caption);
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if ui.small_button(detach_label).clicked() {
-                            detach = true;
-                        }
-                    });
-                });
-            });
-        ui.add_space(6.0);
-        detach
-    }
-
-    fn render_detached_placeholder(ui: &mut egui::Ui, segment: &str) {
-        ui.small(format!(
-            "{segment} is in a separate window. Close it with X to return here."
-        ));
-    }
-
-    fn activity_log_header_label(&self) -> String {
-        let base = {
-            let n = self.debug_logs.len();
-            if n == 0 {
-                "Activity log".to_string()
-            } else {
-                format!("Activity log — {n} events")
-            }
-        };
-        Self::header_with_detach_suffix(
-            base,
-            self.detached.contains_key(&InspectorSection::ActivityLog),
-        )
-    }
-
-    fn deps_header_label(&self) -> String {
-        let base = if !self.tool_caps.has_missing_required() {
-            "✅ Dependencies — all required tools OK".to_string()
-        } else {
-            "⚠ Dependencies — action needed".to_string()
-        };
-        Self::header_with_detach_suffix(
-            base,
-            self.detached.contains_key(&InspectorSection::Dependencies),
-        )
-    }
-
-    fn format_discovery_header_label(&self) -> String {
-        let routes = self.tool_caps.format_routes();
-        let base = format!("Format discovery — {} groups", routes.len());
-        Self::header_with_detach_suffix(
-            base,
-            self.detached
-                .contains_key(&InspectorSection::FormatDiscovery),
-        )
-    }
-
-    fn render_inspector_activity_log(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
-        if self.detached.contains_key(&InspectorSection::ActivityLog) {
-            Self::render_detached_placeholder(ui, "Activity log");
-            return;
-        }
-
-        if Self::render_segment_detach_toolbar(
-            ui,
-            "Scan events, feh commands, warnings",
-            "Detach window",
-        ) {
-            self.detached
-                .insert(InspectorSection::ActivityLog, DetachedWindow::default());
-        }
-        self.render_activity_log_body(ui, ctx);
-    }
-
     fn render_deps_section_body(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
         let deps = self.tool_caps.dependencies();
         for dep in &deps {
@@ -1219,23 +1010,6 @@ impl RustFehApp {
         if ui.button("Recheck tools on PATH").clicked() {
             self.refresh_tool_caps();
         }
-    }
-
-    fn render_inspector_dependencies(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
-        if self.detached.contains_key(&InspectorSection::Dependencies) {
-            Self::render_detached_placeholder(ui, "Dependencies");
-            return;
-        }
-
-        if Self::render_segment_detach_toolbar(
-            ui,
-            "feh, ImageMagick, and other PATH tools",
-            "Detach window",
-        ) {
-            self.detached
-                .insert(InspectorSection::Dependencies, DetachedWindow::default());
-        }
-        self.render_deps_section_body(ui, ctx);
     }
 
     fn render_format_discovery_body(&mut self, ui: &mut egui::Ui) {
@@ -1254,77 +1028,6 @@ impl RustFehApp {
                 self.toggle_format_route(&route_id);
             }
         }
-    }
-
-    fn render_inspector_format_discovery(&mut self, ui: &mut egui::Ui) {
-        if self
-            .detached
-            .contains_key(&InspectorSection::FormatDiscovery)
-        {
-            Self::render_detached_placeholder(ui, "Format discovery");
-            return;
-        }
-
-        if Self::render_segment_detach_toolbar(
-            ui,
-            "Per-format scan, view, and resize routing",
-            "Detach window",
-        ) {
-            self.detached
-                .insert(InspectorSection::FormatDiscovery, DetachedWindow::default());
-        }
-        self.render_format_discovery_body(ui);
-    }
-
-    fn browse_header_label(&self) -> String {
-        let base = match &self.current_dir {
-            None => "Browse — No folder loaded".to_string(),
-            Some(dir) => {
-                let name = dir
-                    .file_name()
-                    .map(|n| n.to_string_lossy().to_string())
-                    .unwrap_or_else(|| dir.display().to_string());
-                if self.search.is_empty() {
-                    format!("Browse — {name}")
-                } else {
-                    format!("Browse — {name} · filtered")
-                }
-            }
-        };
-        Self::header_with_detach_suffix(base, self.detached.contains_key(&InspectorSection::Browse))
-    }
-
-    fn render_inspector_browse(&mut self, ui: &mut egui::Ui) {
-        if self.detached.contains_key(&InspectorSection::Browse) {
-            Self::render_detached_placeholder(ui, "Browse");
-            return;
-        }
-
-        if Self::render_segment_detach_toolbar(
-            ui,
-            "Folder, filter, and sort controls",
-            "Detach window",
-        ) {
-            self.detached
-                .insert(InspectorSection::Browse, DetachedWindow::default());
-        }
-        self.render_browse_controls_body(ui);
-    }
-
-    fn image_actions_header_label(&self) -> String {
-        let base = match &self.selected {
-            None => "Image actions — no selection".to_string(),
-            Some(path) => format!(
-                "Image actions — {}",
-                path.file_name()
-                    .map(|n| n.to_string_lossy().to_string())
-                    .unwrap_or_else(|| path.display().to_string())
-            ),
-        };
-        Self::header_with_detach_suffix(
-            base,
-            self.detached.contains_key(&InspectorSection::ImageActions),
-        )
     }
 
     fn render_image_actions_body(&mut self, ui: &mut egui::Ui, pctx: &PanelContext) {
@@ -1398,21 +1101,6 @@ impl RustFehApp {
         self.render_inspector_image_tools(ui, ctx, pctx);
     }
 
-    fn render_inspector_image_actions(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
-        if self.detached.contains_key(&InspectorSection::ImageActions) {
-            Self::render_detached_placeholder(ui, "Image actions");
-            return;
-        }
-
-        if Self::render_segment_detach_toolbar(ui, "Open in feh and image tools", "Detach window") {
-            self.detached
-                .insert(InspectorSection::ImageActions, DetachedWindow::default());
-        }
-        let pctx = self.panel_context(None);
-        self.render_image_actions_full(ui, ctx, &pctx);
-    }
-
-    /// FR-002 default folder resolution for a new launch entry.
     fn resolve_default_entry_folder(&self) -> Option<PathBuf> {
         if let Some(folder) = &self.selected_tree_folder {
             if folder.is_dir() {
@@ -1450,19 +1138,6 @@ impl RustFehApp {
         }
         folders.sort();
         folders
-    }
-
-    fn feh_instances_header_label(&self) -> String {
-        let n = self.launch_entries.entries.len();
-        let base = if n == 0 {
-            "Feh instances".to_string()
-        } else {
-            format!("Feh instances — {n}")
-        };
-        Self::header_with_detach_suffix(
-            base,
-            self.detached.contains_key(&InspectorSection::FehInstances),
-        )
     }
 
     fn persist_launch_entries(&mut self) {
@@ -1819,22 +1494,6 @@ impl RustFehApp {
         if let Some(action) = action {
             self.apply_feh_entry_action(action);
         }
-    }
-
-    fn render_inspector_feh_instances(&mut self, ui: &mut egui::Ui) {
-        if self.detached.contains_key(&InspectorSection::FehInstances) {
-            Self::render_detached_placeholder(ui, "Feh instances");
-            return;
-        }
-        if Self::render_segment_detach_toolbar(
-            ui,
-            "Manage multiple feh launch configurations",
-            "Detach window",
-        ) {
-            self.detached
-                .insert(InspectorSection::FehInstances, DetachedWindow::default());
-        }
-        self.render_feh_instances_body(ui);
     }
 
     fn tools_output_policy(&self) -> OutputPolicy {
@@ -2493,7 +2152,7 @@ impl RustFehApp {
             .show(ui, |ui| {
                 for (old, new) in &self.tools_panel.rename_preview {
                     ui.label(format!(
-                        "{} → {}",
+                        "{} -> {}",
                         old.file_name().unwrap_or_default().to_string_lossy(),
                         new
                     ));
@@ -2746,285 +2405,190 @@ impl RustFehApp {
 
     fn render_browse_controls_body(&mut self, ui: &mut egui::Ui) {
         let has_folder = self.current_dir.is_some();
-
-        ui.vertical(|ui| {
-            if ui.button("Choose folder").clicked() {
-                self.pick_folder();
+        ui.horizontal_wrapped(|ui| {
+            let mut recursive_changed = false;
+            ui.add_enabled_ui(has_folder, |ui| {
+                recursive_changed = ui.checkbox(&mut self.recursive, "Include subfolders").changed();
+            });
+            if recursive_changed {
+                self.rescan_current_folder_if_any();
             }
 
-            if let Some(dir) = &self.current_dir {
-                let dir_str = dir.display().to_string();
-                ui.add(
-                    egui::Label::new(dir_str.clone())
-                        .selectable(true)
-                        .wrap_mode(egui::TextWrapMode::Truncate),
-                )
-                .on_hover_text(dir_str);
-            } else {
-                ui.small("No folder loaded");
+            let mut deep_changed = false;
+            ui.add_enabled_ui(has_folder, |ui| {
+                deep_changed = ui
+                    .checkbox(&mut self.deep_scan_magick, "Detect exotic formats (slow)")
+                    .on_hover_text("Runs ImageMagick identify on unknown extensions. Off by default for fast feh launch.")
+                    .changed();
+            });
+            if deep_changed {
+                self.rescan_current_folder_if_any();
             }
-
-            ui.add_space(4.0);
-            ui.horizontal(|ui| {
-                ui.label("Filter:");
-                ui.add_enabled_ui(has_folder, |ui| {
-                    let field_w = (ui.available_width() - 4.0).clamp(100.0, 200.0);
-                    ui.add(
-                        egui::TextEdit::singleline(&mut self.search)
-                            .hint_text("Type something to filter")
-                            .desired_width(field_w),
-                    );
-                });
-            });
-
-            ui.add_space(4.0);
-            ui.horizontal(|ui| {
-                let mut recursive_changed = false;
-                ui.add_enabled_ui(has_folder, |ui| {
-                    recursive_changed =
-                        ui.checkbox(&mut self.recursive, "Include subfolders").changed();
-                });
-                if recursive_changed {
-                    self.rescan_current_folder_if_any();
-                }
-            });
-
-            ui.horizontal(|ui| {
-                let mut deep_changed = false;
-                ui.add_enabled_ui(has_folder, |ui| {
-                    deep_changed = ui
-                        .checkbox(
-                            &mut self.deep_scan_magick,
-                            "Detect exotic formats (slow)",
-                        )
-                        .on_hover_text(
-                            "Runs ImageMagick identify on unknown extensions. Off by default for fast feh launch.",
-                        )
-                        .changed();
-                });
-                if deep_changed {
-                    self.rescan_current_folder_if_any();
-                }
-
-                if ui.add_enabled(has_folder, egui::Button::new("Rescan")).clicked() {
-                    self.rescan_current_folder_if_any();
-                }
-            });
-
-            ui.horizontal(|ui| {
-                ui.label("Sort:");
-                ui.add_enabled_ui(has_folder, |ui| {
-                    egui::ComboBox::from_id_salt("sort_mode")
-                        .selected_text(sort_mode_label(self.sort_mode))
-                        .show_ui(ui, |ui| {
-                            ui.selectable_value(&mut self.sort_mode, SortMode::Path, "Path");
-                            ui.selectable_value(&mut self.sort_mode, SortMode::Name, "Name");
-                            ui.selectable_value(&mut self.sort_mode, SortMode::Folder, "Folder");
-                        });
-                });
-            });
-
+            if ui.add_enabled(has_folder, egui::Button::new("Rescan")).clicked() {
+                self.rescan_current_folder_if_any();
+            }
         });
     }
 
-    fn render_inspector_panel(&mut self, ui: &mut egui::Ui, ctx: &egui::Context, time: f64) {
-        // Auto-expand is EDGE-TRIGGERED, not per-frame (018 FIX-1, FR-003): the
-        // rising/falling edges are wired at their event sites — scan start
-        // (`scan_directory`), scan complete (`apply_scan_result`), the
-        // no-folder ↔ folder-loaded transition (`sync_auto_expand_folder_edge`,
-        // called from `update`), and tool-missing detection
-        // (`mark_feh_unavailable`/`refresh_tool_caps`). Nothing to do here.
+    fn render_browser_toolbar(&mut self, ui: &mut egui::Ui, narrow: bool) {
+        let has_folder = self.current_dir.is_some();
+        ui.horizontal_wrapped(|ui| {
+            if ui.button("Open folder").clicked() {
+                self.pick_folder();
+            }
+            ui.label("Filter:");
+            ui.add_enabled_ui(has_folder, |ui| {
+                ui.add(
+                    egui::TextEdit::singleline(&mut self.search)
+                        .hint_text("Filter files")
+                        .desired_width(180.0),
+                );
+            });
+            ui.label("Sort:");
+            ui.add_enabled_ui(has_folder, |ui| {
+                egui::ComboBox::from_id_salt("sort_mode")
+                    .selected_text(sort_mode_label(self.sort_mode))
+                    .show_ui(ui, |ui| {
+                        ui.selectable_value(&mut self.sort_mode, SortMode::Path, "Path");
+                        ui.selectable_value(&mut self.sort_mode, SortMode::Name, "Name");
+                        ui.selectable_value(&mut self.sort_mode, SortMode::Folder, "Folder");
+                    });
+            });
+            self.render_selection_action_controls(ui);
+            if narrow && has_folder && ui.button("Preview").clicked() {
+                self.compact_preview_open = true;
+            }
+        });
+    }
 
-        // Stable base for the Zone D height clamp: the full inspector content
-        // height, captured once before any zone consumes vertical space.
-        let full_h = ui.available_height();
+    fn render_selection_action_controls(&mut self, ui: &mut egui::Ui) {
+        let open = ui.add_enabled(self.feh_open_ready(), egui::Button::new("Open in feh"));
+        if open.clicked() {
+            self.try_open_in_feh();
+        }
+        let selected = self.selected.clone();
+        ui.add_enabled_ui(selected.is_some(), |ui| {
+            ui.menu_button("More", |ui| {
+                if let Some(path) = selected.as_deref() {
+                    let process_hint = self.process_action_block_reason(path);
+                    self.render_context_actions(ui, path, process_hint.as_deref());
+                }
+            });
+        });
+    }
+
+    fn render_browser_workspace(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
+        let width = ctx.screen_rect().width();
+        let narrow = width < MIN_BROWSER_WIDTH + MIN_PREVIEW_WIDTH + 24.0;
+        let has_folder = self.current_dir.is_some();
+        if !has_folder {
+            self.compact_preview_open = false;
+        }
+        if narrow && has_folder && self.compact_preview_open {
+            ui.horizontal(|ui| {
+                if ui.button("Back to list").clicked() {
+                    self.compact_preview_open = false;
+                }
+                ui.weak("Preview");
+            });
+            ui.horizontal_wrapped(|ui| self.render_selection_action_controls(ui));
+            self.render_stage_pane(ui);
+            return;
+        }
+
+        self.render_browser_toolbar(ui, narrow);
+        self.render_inspector_nav_strip(ui);
+        if self.current_dir.is_none() {
+            let spacer = (ui.available_height() * 0.33).max(24.0);
+            ui.vertical_centered(|ui| {
+                ui.add_space(spacer);
+                ui.heading("Choose a folder to begin");
+                ui.label("Browse your images here, then select one to preview or open in feh.");
+                if !self.feh_available {
+                    ui.add_space(8.0);
+                    ui.colored_label(
+                        egui::Color32::YELLOW,
+                        "feh is unavailable. Browsing still works. Use Installed tools for recovery.",
+                    );
+                    if ui.button("Installed tools").clicked() {
+                        self.open_tool_window(InspectorSection::Dependencies);
+                    }
+                }
+            });
+            return;
+        }
 
         let (total, filtered) = self.compute_list_indices();
         let shown = filtered.len();
-        let list_root = self.current_dir.clone();
-
-        // Zone A: persistent nav strip (Up + Flat/Tree + spinner + breadcrumb).
-        self.render_inspector_nav_strip(ui);
-        // Zone B: subfolder drill-down (hidden when there are no subfolders).
-        self.render_inspector_subfolder_drilldown(ui);
-        // Zone C (PRIMARY): the flat/tree image list, virtualized via show_rows.
-        self.render_inspector_file_list(ui, &filtered, list_root.as_deref(), full_h);
-
-        // Zone D: collapsed-by-default meta-drawer gating the 7 detail sections.
         ui.horizontal(|ui| {
-            let toggle_label = if self.inspector_drawer_collapsed {
-                "▶ Details"
-            } else {
-                "▼ Details"
-            };
-            if ui.small_button(toggle_label).clicked() {
-                self.inspector_drawer_collapsed = !self.inspector_drawer_collapsed;
-                // The user now owns the drawer's open/closed state; a later
-                // retraction must not move it (018 FIX-1 / FR-003).
-                self.auto_expand.note_user_drawer_toggle();
+            ui.weak(showing_count_label(shown, total));
+            if self.scanning {
+                ui.spinner();
             }
-            ui.add(
-                egui::Label::new(
-                    egui::RichText::new("Browse · actions · session · log · deps · formats").weak(),
-                )
-                .wrap_mode(egui::TextWrapMode::Truncate),
-            );
         });
-        if self.inspector_drawer_collapsed {
+        let status = self.status_text_for_copy();
+        ui.add_sized(
+            [ui.available_width(), ui.spacing().interact_size.y],
+            egui::Label::new(egui::RichText::new(status.clone()).weak()).truncate(),
+        )
+        .on_hover_text(status);
+        if !self.scan_warnings.is_empty() {
+            ui.horizontal(|ui| {
+                ui.colored_label(
+                    egui::Color32::YELLOW,
+                    format!("{} scan warnings", self.scan_warnings.len()),
+                );
+                if ui.small_button("Activity log").clicked() {
+                    self.open_tool_window(InspectorSection::ActivityLog);
+                }
+                if ui.small_button("Dismiss").clicked() {
+                    self.scan_warnings.clear();
+                }
+            });
+        }
+        self.render_inspector_subfolder_drilldown(ui);
+        let list_root = self.current_dir.clone();
+        if filtered.is_empty() {
+            if self.scanning {
+                ui.weak("Scanning folder…");
+            } else if total == 0 {
+                ui.weak("No images found in this folder.");
+            } else {
+                ui.weak("No files match this filter.");
+                if ui.button("Clear filter").clicked() {
+                    self.search.clear();
+                }
+            }
+        } else {
+            self.render_inspector_file_list(ui, &filtered, list_root.as_deref());
+        }
+    }
+
+    fn compact_preview_layout(ctx: &egui::Context) -> bool {
+        ctx.screen_rect().width() < MIN_BROWSER_WIDTH + MIN_PREVIEW_WIDTH + 24.0
+    }
+
+    fn render_preview_side_panel(&mut self, ctx: &egui::Context) {
+        if Self::compact_preview_layout(ctx) || self.current_dir.is_none() {
             return;
         }
-        let drawer_body_h = Self::sections_drawer_body_height(full_h);
-        egui::ScrollArea::vertical()
-            .id_salt("inspector_sections_drawer")
-            .max_height(drawer_body_h)
-            .show(ui, |ui| {
-                self.render_inspector_sections_drawer_body(ui, ctx, shown, total, time);
+        let viewport_width = ctx.screen_rect().width();
+        let initial_width = (viewport_width / 3.0).clamp(MIN_PREVIEW_WIDTH, 560.0);
+        egui::SidePanel::right("image_preview")
+            .resizable(true)
+            .width_range(MIN_PREVIEW_WIDTH..=560.0)
+            .default_width(initial_width)
+            .show(ctx, |ui| {
+                ui.set_min_width(ui.available_width());
+                ui.heading("Preview");
+                self.render_stage_pane(ui);
             });
     }
 
-    /// Zone D body (018 Batch 2): the 7 detail `CollapsingHeader`s, unchanged
-    /// from Batch 1 except for being wrapped in the bounded drawer ScrollArea
-    /// above instead of rendering inline in the (now-removed) infinite outer
-    /// ScrollArea.
-    fn render_inspector_sections_drawer_body(
-        &mut self,
-        ui: &mut egui::Ui,
-        ctx: &egui::Context,
-        shown: usize,
-        total: usize,
-        time: f64,
-    ) {
-        let browse_header = self.browse_header_label();
-        let browse_response = egui::CollapsingHeader::new(browse_header)
-            .id_salt("inspector_browse")
-            .open(Some(
-                self.inspector_open.contains(&InspectorSection::Browse),
-            ))
-            .show(ui, |ui| {
-                self.render_inspector_browse(ui);
-            });
-        if browse_response.header_response.clicked() {
-            self.toggle_inspector_section(InspectorSection::Browse);
-        }
-
-        let actions_header = self.image_actions_header_label();
-        let actions_response = egui::CollapsingHeader::new(actions_header)
-            .id_salt("inspector_image_actions")
-            .open(Some(
-                self.inspector_open
-                    .contains(&InspectorSection::ImageActions),
-            ))
-            .show(ui, |ui| {
-                self.render_inspector_image_actions(ui, ctx);
-            });
-        if actions_response.header_response.clicked() {
-            self.toggle_inspector_section(InspectorSection::ImageActions);
-        }
-
-        let feh_instances_header = self.feh_instances_header_label();
-        let feh_instances_response = egui::CollapsingHeader::new(feh_instances_header)
-            .id_salt("inspector_feh_instances")
-            .open(Some(
-                self.inspector_open
-                    .contains(&InspectorSection::FehInstances),
-            ))
-            .show(ui, |ui| {
-                self.render_inspector_feh_instances(ui);
-            });
-        if feh_instances_response.header_response.clicked() {
-            self.toggle_inspector_section(InspectorSection::FehInstances);
-        }
-
-        let pulse_fill = if self.scanning {
-            Self::activity_pulse_color(time, true)
-        } else {
-            egui::Color32::TRANSPARENT
-        };
-        let pulse_stroke = if self.scanning {
-            let pulse = ((time * 5.0).sin() * 0.5 + 0.5) as f32;
-            egui::Stroke::new(
-                1.5_f32,
-                egui::Color32::from_rgb(
-                    (80.0 + 100.0 * pulse) as u8,
-                    (160.0 + 60.0 * pulse) as u8,
-                    255,
-                ),
-            )
-        } else {
-            egui::Stroke::NONE
-        };
-        let status_header = self.session_status_header_rich(shown, total, time);
-        let status_response = egui::CollapsingHeader::new(status_header)
-            .id_salt("inspector_session_status")
-            .open(Some(
-                self.inspector_open
-                    .contains(&InspectorSection::SessionStatus),
-            ))
-            .show(ui, |ui| {
-                if self.scanning && !self.detached.contains_key(&InspectorSection::SessionStatus) {
-                    egui::Frame::none()
-                        .fill(pulse_fill)
-                        .stroke(pulse_stroke)
-                        .inner_margin(egui::Margin::symmetric(2.0, 1.0))
-                        .show(ui, |ui| {
-                            self.render_inspector_session_status(ui, ctx, shown, total, time);
-                        });
-                } else {
-                    self.render_inspector_session_status(ui, ctx, shown, total, time);
-                }
-            });
-        if status_response.header_response.clicked() {
-            self.toggle_inspector_section(InspectorSection::SessionStatus);
-        }
-
-        let log_header = self.activity_log_header_label();
-        let log_response = egui::CollapsingHeader::new(log_header)
-            .id_salt("inspector_activity_log")
-            .open(Some(
-                self.inspector_open.contains(&InspectorSection::ActivityLog),
-            ))
-            .show(ui, |ui| {
-                self.render_inspector_activity_log(ui, ctx);
-            });
-        if log_response.header_response.clicked() {
-            self.toggle_inspector_section(InspectorSection::ActivityLog);
-        }
-
-        let deps_header = self.deps_header_label();
-        let deps_response = egui::CollapsingHeader::new(deps_header)
-            .id_salt("tool_deps")
-            .open(Some(
-                self.inspector_open
-                    .contains(&InspectorSection::Dependencies),
-            ))
-            .show(ui, |ui| {
-                self.render_inspector_dependencies(ui, ctx);
-            });
-        if deps_response.header_response.clicked() {
-            self.toggle_inspector_section(InspectorSection::Dependencies);
-        }
-
-        let fd_header = self.format_discovery_header_label();
-        let fd_response = egui::CollapsingHeader::new(fd_header)
-            .id_salt("tool_format_discovery")
-            .open(Some(
-                self.inspector_open
-                    .contains(&InspectorSection::FormatDiscovery),
-            ))
-            .show(ui, |ui| {
-                self.render_inspector_format_discovery(ui);
-            });
-        if fd_response.header_response.clicked() {
-            self.toggle_inspector_section(InspectorSection::FormatDiscovery);
-        }
-
-        if self.tool_caps.has_missing_required() {
-            ui.separator();
-            ui.colored_label(
-                egui::Color32::from_rgb(220, 80, 80),
-                "Install required tools above, then click Recheck.",
-            );
-        }
+    fn render_central_image_panel(&mut self, ctx: &egui::Context) {
+        egui::CentralPanel::default().show(ctx, |ui| {
+            self.render_browser_workspace(ui, ctx);
+        });
     }
 
     fn status_text_for_copy(&self) -> String {
@@ -3044,150 +2608,6 @@ impl RustFehApp {
     }
 
     /// Collapsed inspector headers stay compact (count only); full status lives in the body.
-    fn session_status_header_rich(&self, shown: usize, total: usize, time: f64) -> egui::RichText {
-        let count = showing_count_label(shown, total);
-        let mut label = if self.scanning {
-            let dots = [".", "..", "..."][(time as usize / 2) % 3];
-            format!("● Session status — {count} · Scanning{dots}")
-        } else {
-            format!("Session status — {count}")
-        };
-
-        if self.detached.contains_key(&InspectorSection::SessionStatus) {
-            label = Self::header_with_detach_suffix(label, true);
-        }
-
-        let mut rich = egui::RichText::new(label);
-        if self.scanning && !self.detached.contains_key(&InspectorSection::SessionStatus) {
-            let pulse = ((time * 5.0).sin() * 0.5 + 0.5) as f32;
-            rich = rich.color(egui::Color32::from_rgb(
-                (120.0 + 80.0 * pulse) as u8,
-                (170.0 + 60.0 * pulse) as u8,
-                255,
-            ));
-        }
-        rich
-    }
-
-    fn inspector_max_width(ctx: &egui::Context) -> f32 {
-        let viewport_w = ctx.input(|i| i.viewport().inner_rect.map(|r| r.width()).unwrap_or(720.0));
-        // Inspector must not exceed the central image-list panel (each gets at least half).
-        (viewport_w * 0.5).max(260.0)
-    }
-
-    /// Auto-sized width (px) for the right-hand Inspector SidePanel
-    /// (feature 017, Phase 5).
-    ///
-    /// The panel is non-resizable and sized to the widest *static* label so its
-    /// width never jitters as dynamic text (folder names, file names, live
-    /// counts, scan status, selection) changes — a long SMB path must never be
-    /// able to peg it wide. Only compile-time string literals are measured (the
-    /// `const STATIC_LABELS: &[&str]` type makes it impossible to add runtime
-    /// state here). Only the *measured text width* is cached, keyed on
-    /// `pixels_per_point` — the sole input to text measurement in this app (it
-    /// never mutates fonts, text styles, theme, or zoom; egui's Ctrl +/- zoom is
-    /// also covered because it flows through `pixels_per_point`). The clamp to
-    /// the live half-viewport is recomputed EVERY call (018 F3) so the width
-    /// tracks window resizes instead of going stale at whatever half-viewport
-    /// happened to be in effect the last time `pixels_per_point` changed.
-    fn inspector_width(&mut self, ctx: &egui::Context) -> f32 {
-        // ONLY literal, hardcoded strings that never change at runtime. NEVER a
-        // `self.*` value or `format!()` output. For headers whose live text is
-        // dynamic, a static identity/fallback template is measured instead of the
-        // live label; the dynamic tail (counts, names, paths) truncates, it does
-        // not size the panel.
-        const STATIC_LABELS: &[&str] = &[
-            // Section-header identity / static fallback templates.
-            "Browse — No folder loaded",
-            "Image actions — no selection",
-            "Feh instances",
-            "Session status",
-            "Activity log",
-            "✅ Dependencies — all required tools OK",
-            "Format discovery",
-            // Button / checkbox captions. All below the 440px floor today, so
-            // they never change the result; kept for completeness + robustness.
-            // Being constants, they can never introduce jitter.
-            "Choose folder",
-            "Rescan",
-            "Include subfolders",
-            "Detect exotic formats (slow)",
-            "Recheck tools on PATH",
-            "Open in feh",
-            "Copy status",
-            "Detach window",
-            // Zone A nav strip (018 Batch 2): Up button + Flat/Tree view toggle.
-            "⬆ Up",
-            "Flat list",
-            "Folder tree",
-            // Zone D drawer meta-toggle + its static description line (018
-            // Batch 2) — the description is the widest static label in the
-            // panel (measured ~252px incl. Button-style font metrics), still
-            // well under the 440px floor's ~392px usable text budget.
-            "▶ Details",
-            "▼ Details",
-            "Browse · actions · session · log · deps · formats",
-            // Pin-to-current-image toggle in the detached Image-actions window
-            // (018 Batch 5). Rendered in a separate egui::Window, not this
-            // SidePanel, but included for completeness/robustness per the
-            // doctrine above — cannot introduce jitter, being a constant.
-            "Pin to current image",
-            "Unpin (follow selection)",
-            // Zone C flat-list column headers (018 Batch 2).
-            "Folder",
-            "Filename",
-            "Status",
-            // NOTE (018 FIX-11): the seven detach-toolbar descriptions and the
-            // "Install required tools above, then click Recheck." line are
-            // panel-rendered but intentionally NOT listed here. They render at
-            // `ui.small()` (smaller than the Button metric measured above) and
-            // their widest (~285px) sits well under the 440px floor, so they can
-            // never size the panel. This list is therefore ADVISORY below the
-            // floor: it does not need to enumerate every sub-floor caption.
-        ];
-
-        // Fixed horizontal chrome added around the widest label so it is never
-        // clipped:
-        //   SidePanel frame inner margin (8 + 8; exact_width is "incl. margins") = 16
-        //   CollapsingHeader indent gutter (spacing.indent = 18)                 = 18
-        //   CollapsingHeader trailing button_padding.x (= 4)                     =  4
-        //   inner list/drawer ScrollArea bar allowance (scroll bar_width = 10)   = 10
-        // (018 FIX-11: post-Batch-2 the infinite OUTER panel ScrollArea is gone;
-        // the 10px now covers the Zone C list / Zone D drawer inner scrollbars.)
-        const PANEL_CHROME: f32 = 48.0;
-
-        let ppp = ctx.pixels_per_point();
-        let max_text = match self.inspector_width_cache {
-            Some((cached_ppp, cached_max_text)) if cached_ppp == ppp => cached_max_text,
-            _ => {
-                // CollapsingHeader labels render at TextStyle::Button; Body == Button
-                // size in egui defaults, so one FontId measures headers, the intro
-                // label, and button captions correctly.
-                let font_id = egui::TextStyle::Button.resolve(&ctx.style());
-                let measured = ctx.fonts(|f| {
-                    STATIC_LABELS
-                        .iter()
-                        .map(|s| {
-                            f.layout_no_wrap((*s).to_owned(), font_id.clone(), egui::Color32::WHITE)
-                                .size()
-                                .x
-                        })
-                        .fold(0.0_f32, f32::max)
-                });
-                self.inspector_width_cache = Some((ppp, measured));
-                measured
-            }
-        };
-
-        // Clamp to [440, half-viewport] EVERY call (not cached) so width tracks
-        // live window resizes. The half-viewport cap is a HARD upper bound; when
-        // the window is so narrow the cap falls below 440, the cap wins — and
-        // floor == upper here avoids an f32::clamp(min > max) panic.
-        let upper = Self::inspector_max_width(ctx);
-        let floor = 440.0_f32.min(upper);
-        (max_text + PANEL_CHROME).clamp(floor, upper)
-    }
-
     fn render_session_status_body(
         &mut self,
         ui: &mut egui::Ui,
@@ -3251,43 +2671,15 @@ impl RustFehApp {
         });
     }
 
-    fn render_inspector_session_status(
-        &mut self,
-        ui: &mut egui::Ui,
-        ctx: &egui::Context,
-        shown: usize,
-        total: usize,
-        time: f64,
-    ) {
-        if self.detached.contains_key(&InspectorSection::SessionStatus) {
-            Self::render_detached_placeholder(ui, "Session status");
-            return;
-        }
-
-        if Self::render_segment_detach_toolbar(
-            ui,
-            "Image count, current status, operation speed tips",
-            "Detach window",
-        ) {
-            self.detached
-                .insert(InspectorSection::SessionStatus, DetachedWindow::default());
-        }
-        self.render_session_status_body(ui, ctx, shown, total, time);
-    }
-
-    /// Window title + default width for a detached inspector section. Pure
-    /// lookup, no `self` borrow, so it can be called freely from inside the
-    /// `render_detached_inspector_windows` loop without fighting the borrow
-    /// checker over the closure's `&mut self` capture.
     fn detached_window_chrome(section: InspectorSection) -> (&'static str, f32) {
         match section {
-            InspectorSection::Browse => ("Browse", 520.0),
-            InspectorSection::ImageActions => ("Image actions", 360.0),
-            InspectorSection::FehInstances => ("Feh instances", 420.0),
-            InspectorSection::SessionStatus => ("Session status", 480.0),
+            InspectorSection::Browse => ("Scan settings", 520.0),
+            InspectorSection::ImageActions => ("Image Tools and pinning", 360.0),
+            InspectorSection::FehInstances => ("Saved feh launches", 420.0),
+            InspectorSection::SessionStatus => ("Session status and inventory", 480.0),
             InspectorSection::ActivityLog => ("Activity log", 520.0),
-            InspectorSection::Dependencies => ("Dependencies", 420.0),
-            InspectorSection::FormatDiscovery => ("Format discovery", 480.0),
+            InspectorSection::Dependencies => ("Installed tools", 420.0),
+            InspectorSection::FormatDiscovery => ("Format support", 480.0),
         }
     }
 
@@ -3379,7 +2771,7 @@ impl RustFehApp {
     fn emit_startup_notice_once() {
         STARTUP_NOTICE.call_once(|| {
             eprintln!(
-                "[rust-feh] App started. Use 'Choose folder' to load images. Debug logs appear in the UI after actions."
+                "[rust-feh] App started. Use Open folder to load images. Open Activity log from Tools for details."
             );
         });
     }
@@ -3450,27 +2842,44 @@ impl RustFehApp {
         }
     }
 
+    fn open_tool_window(&mut self, section: InspectorSection) {
+        self.detached.entry(section).or_default();
+    }
+
+    fn render_tools_menu(&mut self, ui: &mut egui::Ui) {
+        ui.menu_button("Tools", |ui| {
+            for (label, section) in [
+                ("Scan settings…", InspectorSection::Browse),
+                ("Image Tools and pinning…", InspectorSection::ImageActions),
+                ("Saved feh launches…", InspectorSection::FehInstances),
+                ("Session status and inventory…", InspectorSection::SessionStatus),
+                ("Activity log…", InspectorSection::ActivityLog),
+                ("Format support…", InspectorSection::FormatDiscovery),
+            ] {
+                if ui.button(label).clicked() {
+                    self.open_tool_window(section);
+                    ui.close_menu();
+                }
+            }
+            let tools_label = if self.tool_caps.has_missing_required() {
+                "Installed tools — attention needed"
+            } else {
+                "Installed tools…"
+            };
+            if ui.button(tools_label).clicked() {
+                self.open_tool_window(InspectorSection::Dependencies);
+                ui.close_menu();
+            }
+        });
+    }
+
     fn render_top_menu_bar(&mut self, ctx: &egui::Context) {
         egui::TopBottomPanel::top("controls").show(ctx, |ui| {
             egui::menu::bar(ui, |ui| {
                 ui.menu_button("View", |ui| self.render_view_menu(ui));
+                self.render_tools_menu(ui);
             });
         });
-    }
-
-    fn render_inspector_side_panel(&mut self, ctx: &egui::Context) {
-        let inspector_w = self.inspector_width(ctx);
-        egui::SidePanel::right("inspector")
-            .resizable(false)
-            .exact_width(inspector_w)
-            .show(ctx, |ui| {
-                // No set_max_width here (018 FIX-9): SidePanel::exact_width already
-                // fixes the content width; an extra set_max_width(inspector_w) is
-                // applied to the post-margin inner Ui and pushes content ~8px past
-                // the panel edge (egui 0.30 placer semantics).
-                let time = ctx.input(|i| i.time);
-                self.render_inspector_panel(ui, ctx, time);
-            });
     }
 
     /// Zone A (018 Batch 2): persistent single-row nav strip — Up button,
@@ -3490,7 +2899,7 @@ impl RustFehApp {
         let mut target: Option<PathBuf> = None;
         ui.horizontal(|ui| {
             if ui
-                .add_enabled(up_target.is_some(), egui::Button::new("⬆ Up"))
+                .add_enabled(up_target.is_some(), egui::Button::new("Up"))
                 .clicked()
             {
                 target = up_target.clone();
@@ -3575,7 +2984,6 @@ impl RustFehApp {
         ui: &mut egui::Ui,
         filtered: &[usize],
         list_root: Option<&Path>,
-        full_h: f32,
     ) {
         let row_h = 18.0;
         let item_spacing_y = ui.spacing().item_spacing.y;
@@ -3588,16 +2996,14 @@ impl RustFehApp {
         } else {
             0.0
         };
-        // The list sits inside an `egui::Frame::group` with `inner_margin(4.0)`
-        // (8px top+bottom) followed by one trailing `item_spacing`; reserve both
-        // so tall lists never overflow the inspector (018 FIX-8).
+        // The list sits inside an `egui::Frame::group` with inner margin and
+        // spacing; preserve bounded rows without reserving space for the retired drawer.
         let group_chrome = 4.0 * 2.0 + item_spacing_y;
-        let drawer_reserved = self.sections_drawer_reserved_height(full_h);
         let total_w = ui.available_width();
-        let folder_col_w = total_w * 0.35;
-        let status_col_w = total_w * 0.25;
+        let folder_col_w = total_w * 0.20;
+        let status_col_w = total_w * 0.20;
         let metrics = ImageListMetrics {
-            list_height: (ui.available_height() - header_h - group_chrome - drawer_reserved)
+            list_height: (ui.available_height() - header_h - group_chrome)
                 .max(row_h * 4.0),
             folder_col_w,
             // Filename column takes the middle band; a fixed width lets the
@@ -3615,21 +3021,6 @@ impl RustFehApp {
                     self.render_tree_image_list(ui, list_root, metrics.list_height, row_h);
                 }
             });
-    }
-
-    /// Inner scroll-body height of the expanded Zone D drawer. Clamped so the
-    /// drawer never starves Zone C nor grows unbounded. Base is the full
-    /// inspector content height (captured once, before any zone renders) so the
-    /// drawer size is stable frame-to-frame regardless of Zone A/B content.
-    fn sections_drawer_body_height(full_h: f32) -> f32 {
-        sections_drawer_body_height(full_h)
-    }
-
-    /// Total vertical space Zone D consumes, which Zone C reserves before it
-    /// renders. Collapsed: just the toggle row. Expanded: toggle row plus the
-    /// bounded scroll body. Pure math lives in `ui_logic` (unit-tested, 018 FIX-8).
-    fn sections_drawer_reserved_height(&self, full_h: f32) -> f32 {
-        sections_drawer_reserved_height(full_h, self.inspector_drawer_collapsed)
     }
 
     fn render_scan_inventory_banner(&self, ui: &mut egui::Ui, list_root: Option<&Path>) {
@@ -3678,10 +3069,11 @@ impl RustFehApp {
         let folder = relative_folder(list_root, &path);
         let name = file_name_display(&path);
         let status = file_status_label(self.images[idx].status);
-        let decodable = file_status_decodable(self.images[idx].status);
         let is_selected = self.selected.as_ref() == Some(&path);
         ui.horizontal(|ui| {
             ui.allocate_ui(egui::vec2(metrics.folder_col_w, metrics.row_h), |ui| {
+                ui.set_min_width(metrics.folder_col_w);
+                ui.set_max_width(metrics.folder_col_w);
                 ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Truncate);
                 ui.label(egui::RichText::new(folder).weak());
             });
@@ -3690,14 +3082,18 @@ impl RustFehApp {
             // Status column (018 FIX-10).
             let response = ui
                 .allocate_ui(egui::vec2(metrics.name_col_w, metrics.row_h), |ui| {
+                    ui.set_min_width(metrics.name_col_w);
+                    ui.set_max_width(metrics.name_col_w);
                     ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Truncate);
                     ui.selectable_label(is_selected, &name)
                 })
                 .inner
                 .on_hover_text(path.display().to_string());
-            self.render_image_context_menu(&response, &path, decodable);
+            self.render_image_context_menu(&response, &path);
             self.handle_image_row_click(&response, path);
             ui.allocate_ui(egui::vec2(metrics.status_col_w, metrics.row_h), |ui| {
+                ui.set_min_width(metrics.status_col_w);
+                ui.set_max_width(metrics.status_col_w);
                 ui.small(status);
             });
         });
@@ -3712,10 +3108,18 @@ impl RustFehApp {
     ) {
         ui.horizontal(|ui| {
             ui.allocate_ui(egui::vec2(metrics.folder_col_w, metrics.row_h), |ui| {
+                ui.set_min_width(metrics.folder_col_w);
+                ui.set_max_width(metrics.folder_col_w);
                 ui.strong("Folder");
             });
-            ui.strong("Filename");
+            ui.allocate_ui(egui::vec2(metrics.name_col_w, metrics.row_h), |ui| {
+                ui.set_min_width(metrics.name_col_w);
+                ui.set_max_width(metrics.name_col_w);
+                ui.strong("Filename");
+            });
             ui.allocate_ui(egui::vec2(metrics.status_col_w, metrics.row_h), |ui| {
+                ui.set_min_width(metrics.status_col_w);
+                ui.set_max_width(metrics.status_col_w);
                 ui.strong("Status");
             });
         });
@@ -3778,10 +3182,10 @@ impl RustFehApp {
         tree_row: &TreeRow,
         list_root: Option<&Path>,
     ) {
-        let prefix = if tree_row.expanded { "▼" } else { "▶" };
+        let prefix = if tree_row.expanded { "[-]" } else { "[+]" };
         let name = folder_tree_display_name(&tree_row.folder_path, list_root);
         let suffix = folder_line_suffix(tree_row.listed, tree_row.magick, tree_row.skipped);
-        let label = format!("{prefix} {name}  — {suffix}");
+        let label = format!("{prefix} {name} - {suffix}");
         if ui.selectable_label(false, label).clicked() {
             self.toggle_tree_folder(&tree_row.folder_path);
         }
@@ -3796,19 +3200,17 @@ impl RustFehApp {
         }
         let path = self.images[idx].path.clone();
         let name = file_name_display(&path);
-        let glyph = tree_file_glyph(self.images[idx].status);
         let status = file_status_label(self.images[idx].status);
-        let decodable = file_status_decodable(self.images[idx].status);
         let label = if self.images[idx].status == rust_feh::types::FileStatus::Converted {
-            format!("{glyph} {name}  [{status}]")
+            format!("{name}  [{status}]")
         } else {
-            format!("{glyph} {name}")
+            name
         };
         let is_selected = self.selected.as_ref() == Some(&path);
         ui.horizontal(|ui| {
             ui.add_space(indent);
             let response = ui.selectable_label(is_selected, label);
-            self.render_image_context_menu(&response, &path, decodable);
+            self.render_image_context_menu(&response, &path);
             self.handle_image_row_click(&response, path);
         });
     }
@@ -3887,20 +3289,6 @@ impl RustFehApp {
         self.tree_rows_cache = tree_rows; // restore
     }
 
-    /// Central panel after 018 Batch 2 (decision 2): the file list, subfolder
-    /// nav, and inventory banner all moved into the inspector (Zones A-D); the
-    /// central panel now renders ONLY the stage (currently-viewed) image,
-    /// filling the panel.
-    fn render_central_image_panel(&mut self, ctx: &egui::Context) {
-        egui::CentralPanel::default().show(ctx, |ui| {
-            egui::Frame::group(ui.style())
-                .inner_margin(6.0)
-                .show(ui, |ui| {
-                    self.render_stage_pane(ui);
-                });
-        });
-    }
-
     fn request_repaint_if_busy(&self, ctx: &egui::Context) {
         let busy = self.is_activity_busy();
         let tip_animating = !self.tool_caps.operation_timings().is_empty();
@@ -3922,9 +3310,8 @@ impl RustFehApp {
         self.stage_generation = self.stage_generation.wrapping_add(1);
         let generation = self.stage_generation;
         let Some(path) = self.selected.clone() else {
-            self.stage_state = StageState::Failed {
-                reason: "No image selected".to_string(),
-            };
+            self.stage_state = StageState::Idle;
+            self.stage_rx = None;
             self.stage_texture = None;
             return;
         };
@@ -3989,43 +3376,24 @@ impl RustFehApp {
         }
     }
 
-    // --- Stage pane render + context menu (feature 016, contracts/stage-context-menu.md) ---
+    // --- Preview render + context menu (feature 016) ---
 
     fn render_stage_pane(&mut self, ui: &mut egui::Ui) {
-        ui.horizontal(|ui| {
-            let toggle_label = if self.stage_pane_collapsed {
-                "▶ Stage"
-            } else {
-                "▼ Stage"
-            };
-            if ui.small_button(toggle_label).clicked() {
-                self.stage_pane_collapsed = !self.stage_pane_collapsed;
-            }
-            self.render_stage_status_line(ui);
-        });
-        if self.stage_pane_collapsed {
-            return;
-        }
+        self.render_stage_status_line(ui);
         self.render_stage_image(ui);
     }
 
     fn render_stage_status_line(&self, ui: &mut egui::Ui) {
-        match &self.stage_state {
-            StageState::Loading => {
-                ui.weak("Loading…");
-            }
-            StageState::Failed { reason } => {
-                let name = self
-                    .selected
-                    .as_deref()
-                    .map(file_name_display)
-                    .unwrap_or_default();
-                ui.weak(format!("Cannot preview {name}: {reason}"));
-            }
-            StageState::Ready { width, height } => {
-                ui.weak(format!("{width}×{height}"));
-            }
-        }
+        let selected_name = self
+            .selected
+            .as_deref()
+            .map(file_name_display);
+        let status = stage_preview_status(&self.stage_state, selected_name.as_deref());
+        ui.add_sized(
+            [ui.available_width(), ui.spacing().interact_size.y],
+            egui::Label::new(egui::RichText::new(status.clone()).weak()).truncate(),
+        )
+        .on_hover_text(status);
     }
 
     fn render_stage_image(&mut self, ui: &mut egui::Ui) {
@@ -4048,60 +3416,87 @@ impl RustFehApp {
                 .fit_to_exact_size(draw_size)
                 .sense(egui::Sense::click()),
         );
-        let decodable = matches!(self.stage_state, StageState::Ready { .. });
-        self.render_image_context_menu(&response, &path, decodable);
+        self.render_image_context_menu(&response, &path);
     }
 
-    /// Shared right-click context menu for a decodable image, used by BOTH the
-    /// central stage and file-list rows (feature 018 B3.3). `decodable` gates the
-    /// process-only actions (Resize/Convert/Copy image): the stage derives it from
-    /// `StageState::Ready`, list rows from `file_status_decodable(status)`.
+    /// Shared action menu for the selected preview and row context menus. Filesystem
+    /// actions stay available for unreadable images; decode-dependent actions are
+    /// enabled only after the current selection's preview decode succeeds.
     fn render_image_context_menu(
         &mut self,
         response: &egui::Response,
         path: &Path,
-        decodable: bool,
     ) {
         response.context_menu(|ui| {
-            let ctx = ui.ctx().clone();
-            if ui.button("Save a copy…").clicked() {
-                self.action_save_copy(path);
-                ui.close_menu();
-            }
-            if ui.button("Move to…").clicked() {
-                self.action_move_to(path);
-                ui.close_menu();
-            }
-            if ui
-                .add_enabled(decodable, egui::Button::new("Resize copy"))
-                .clicked()
-            {
-                self.action_resize_copy(path);
-                ui.close_menu();
-            }
-            ui.add_enabled_ui(decodable, |ui| {
-                ui.menu_button("Convert format", |ui| {
-                    for fmt in ["jpg", "png", "webp"] {
-                        if ui.button(fmt).clicked() {
-                            self.action_convert_format(path, fmt);
-                            ui.close_menu();
-                        }
-                    }
-                });
-            });
-            if ui.button("Copy path").clicked() {
-                ctx.copy_text(path.display().to_string());
-                self.record_action_outcome(ContextAction::CopyPath, path, None, Ok(None));
-                ui.close_menu();
-            }
-            if ui
-                .add_enabled(decodable, egui::Button::new("Copy image"))
-                .clicked()
-            {
-                self.action_copy_image(path);
-                ui.close_menu();
-            }
+            let process_hint = self.process_action_block_reason(path);
+            self.render_context_actions(ui, path, process_hint.as_deref());
         });
+    }
+
+    fn process_action_block_reason(&self, path: &Path) -> Option<String> {
+        if self.selected.as_deref() != Some(path) {
+            return Some("Select this image to enable image processing.".to_owned());
+        }
+        if !process_actions_enabled_for_selection(
+            self.selected.as_deref(),
+            self.stage_requested_path.as_deref(),
+            &self.stage_state,
+        ) {
+            return Some(match &self.stage_state {
+                StageState::Failed { .. } => "Preview failed. Save, Move, and Copy path remain available.".to_owned(),
+                StageState::Loading => "Preview is loading; processing will be available when it finishes.".to_owned(),
+                StageState::Idle => "Select this image to preview before processing it.".to_owned(),
+                StageState::Ready { .. } => "Preview is updating for this selection.".to_owned(),
+            });
+        }
+        None
+    }
+
+    fn render_context_actions(&mut self, ui: &mut egui::Ui, path: &Path, process_hint: Option<&str>) {
+        let decodable = process_hint.is_none();
+        if ui.button("Save a copy…").clicked() {
+            self.action_save_copy(path);
+            ui.close_menu();
+        }
+        if ui.button("Move to…").clicked() {
+            self.action_move_to(path);
+            ui.close_menu();
+        }
+        if ui
+            .add_enabled(decodable, egui::Button::new("Resize copy"))
+            .clicked()
+        {
+            self.action_resize_copy(path);
+            ui.close_menu();
+        }
+        ui.add_enabled_ui(decodable, |ui| {
+            ui.menu_button("Convert format", |ui| {
+                for fmt in ["jpg", "png", "webp"] {
+                    if ui.button(fmt).clicked() {
+                        self.action_convert_format(path, fmt);
+                        ui.close_menu();
+                    }
+                }
+            });
+        });
+        if ui.button("Copy path").clicked() {
+            ui.ctx().copy_text(path.display().to_string());
+            self.record_action_outcome(ContextAction::CopyPath, path, None, Ok(None));
+            ui.close_menu();
+        }
+        if ui
+            .add_enabled(decodable, egui::Button::new("Copy image"))
+            .clicked()
+        {
+            self.action_copy_image(path);
+            ui.close_menu();
+        }
+        if !decodable {
+            ui.separator();
+            if let Some(hint) = process_hint {
+                ui.weak(hint);
+            }
+        }
     }
 
     // --- Context actions (feature 016, FR-002..FR-006/FR-010) ---
@@ -4328,7 +3723,6 @@ impl App for RustFehApp {
         self.maybe_load_start_folder();
         // Edge-detect no-folder ↔ folder-loaded AFTER the start-folder auto-load
         // has settled `current_dir` (018 FIX-1).
-        self.sync_auto_expand_folder_edge();
         self.poll_scan_complete(ctx);
         self.poll_subfolders(ctx);
         self.poll_tools_job(ctx);
@@ -4339,7 +3733,7 @@ impl App for RustFehApp {
         self.poll_stage_decode(ctx);
 
         self.render_top_menu_bar(ctx);
-        self.render_inspector_side_panel(ctx);
+        self.render_preview_side_panel(ctx);
         self.render_central_image_panel(ctx);
 
         self.render_detached_inspector_windows(ctx);
@@ -4352,10 +3746,7 @@ impl RustFehApp {
         let disp = path.display().to_string();
         self.selected = Some(path);
         self.log(format!("Selected image: {}", disp));
-        self.status = format!(
-            "Selected: {}. Use Image actions to open in feh, or right-click for Resize/Convert.",
-            disp
-        );
+        self.status = format!("Selected: {disp}. Use Open in feh or More for actions.");
     }
 
     fn apply_scan_partial(&mut self, entries: Vec<ImageEntry>, skipped: usize) {
@@ -4505,18 +3896,9 @@ impl RustFehApp {
         self.pending_scroll_path = None;
         // cache invariant: bump on every self.images mutation
         self.images_revision = self.images_revision.wrapping_add(1);
-        // Scan start = rising edge for Session status (018 FIX-1): a new scan
-        // attempt is a fresh scope (lift any prior user-close latch), then open
-        // Session status + expand the drawer once.
-        self.auto_expand
-            .begin_scope(InspectorSection::SessionStatus);
-        self.auto_expand.request_open(
-            InspectorSection::SessionStatus,
-            &mut self.inspector_open,
-            &mut self.inspector_drawer_collapsed,
-        );
         self.selected_tree_folder = None;
         self.scan_inventory = None;
+        self.scan_warnings.clear();
         self.tree_expanded_paths = default_tree_expanded();
         self.scan_generation = self.scan_generation.wrapping_add(1);
         self.scroll_generation = self.scroll_generation.wrapping_add(1);
@@ -4589,6 +3971,7 @@ impl RustFehApp {
     }
 
     fn apply_scan_result(&mut self, dir_label: &str, result: ScanResult) {
+        self.scan_warnings = result.warnings.clone();
         for w in &result.warnings {
             self.log(w.clone());
         }
@@ -4649,15 +4032,6 @@ impl RustFehApp {
             self.log(format!("Auto-selected first image: {}", p.display()));
         }
 
-        // Scan complete = falling edge for Session status (018 FIX-1): retract it
-        // if the machine still owns it (a user who opened it stays), returning the
-        // drawer to collapsed when nothing else is open (SC-001 / US1-AS2). Only
-        // reached for the current generation's Complete message.
-        self.auto_expand.retract(
-            InspectorSection::SessionStatus,
-            &mut self.inspector_open,
-            &mut self.inspector_drawer_collapsed,
-        );
     }
 
     /// Open the current filtered list in a round-trip feh viewer (feature 016,
