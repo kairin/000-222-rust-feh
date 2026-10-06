@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Install ~/.local/bin/sudo-askpass for GUI sudo prompts.
-# Shell config (SUDO_ASKPASS in ~/.bashrc.d/) comes from the 000-0-dotfiles repo.
+# This script does not set SUDO_ASKPASS. Set it in your shell config, for example
+# `export SUDO_ASKPASS=$HOME/.local/bin/sudo-askpass`. 000-0-dotfiles is
+# documentation only since 2026-10-07 (see its docs/configuration-reference.md).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
