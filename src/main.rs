@@ -4111,8 +4111,13 @@ impl RustFehApp {
         let viewer_id = self.next_viewer_id;
         let handoff = handoff_path(std::process::id(), viewer_id);
         let profile_dir = viewer_profile_dir();
+        let picked_dir = std::env::var_os("HOME")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| PathBuf::from("."))
+            .join("Pictures")
+            .join("picked");
         let (program, args, envs) =
-            viewer_spawn_command(list_path, start_at, &handoff, &profile_dir);
+            viewer_spawn_command(list_path, start_at, &handoff, &profile_dir, &picked_dir);
 
         let mut cmd = Command::new(&program);
         cmd.args(&args);

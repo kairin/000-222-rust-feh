@@ -114,11 +114,17 @@ pub fn viewer_spawn_command(
     start_at: &Path,
     handoff_path: &Path,
     profile_dir: &Path,
+    picked_dir: &Path,
 ) -> (String, Vec<String>, Vec<(String, String)>) {
     let info_command = format!(
         "echo %F > {}",
         shell_single_quote(&handoff_path.display().to_string())
     );
+    // Key `1` in the viewer copies the shown image into `picked_dir`
+    // (`cp -n`: never overwrites). feh shell-escapes `%F`; the directory is
+    // shell-quoted here.
+    let picked = shell_single_quote(&picked_dir.display().to_string());
+    let pick_action = format!("mkdir -p {picked} && cp -n %F {picked}/");
     let args = vec![
         "--geometry".to_string(),
         FEH_VIEWER_GEOMETRY.to_string(),
@@ -127,6 +133,8 @@ pub fn viewer_spawn_command(
         FEH_VIEWER_ZOOM.to_string(),
         "--info".to_string(),
         info_command,
+        "--action1".to_string(),
+        pick_action,
         "--filelist".to_string(),
         filelist_path.display().to_string(),
         "--start-at".to_string(),
@@ -2715,6 +2723,7 @@ mod tests {
             Path::new("/home/user/pics/photo.jpg"),
             Path::new("/tmp/rust-feh/handoff-1"),
             Path::new("/home/user/.config/rust-feh/viewer-profile"),
+            Path::new("/home/user/Pictures/picked"),
         );
         assert_eq!(program, "feh");
         assert_eq!(
@@ -2727,6 +2736,9 @@ mod tests {
                 FEH_VIEWER_ZOOM.to_string(),
                 "--info".to_string(),
                 "echo %F > '/tmp/rust-feh/handoff-1'".to_string(),
+                "--action1".to_string(),
+                "mkdir -p '/home/user/Pictures/picked' && cp -n %F '/home/user/Pictures/picked'/"
+                    .to_string(),
                 "--filelist".to_string(),
                 "/tmp/rust-feh/filelist-1.txt".to_string(),
                 "--start-at".to_string(),
@@ -2752,6 +2764,7 @@ mod tests {
             Path::new(start_at),
             Path::new(handoff),
             Path::new("/tmp/profile"),
+            Path::new("/tmp/picked"),
         );
         // The invocation is many separate arguments, never one joined shell line.
         assert!(
@@ -2781,6 +2794,7 @@ mod tests {
             Path::new(adversarial),
             Path::new("/tmp/rust-feh/handoff-2"),
             Path::new("/tmp/profile"),
+            Path::new("/tmp/picked"),
         );
         // --start-at value is the path VERBATIM: it is its own arg-vector element,
         // not shell-parsed text, so it receives no escaping and no truncation.
@@ -2791,7 +2805,7 @@ mod tests {
         assert_eq!(args[fl_idx + 1], filelist);
         // Same total arg count/shape as the ordinary case: the adversarial
         // content did not fracture into extra or fewer arguments.
-        assert_eq!(args.len(), 11);
+        assert_eq!(args.len(), 13);
     }
 
     #[test]
@@ -2802,6 +2816,7 @@ mod tests {
             Path::new("/tmp/start.jpg"),
             Path::new(handoff),
             Path::new("/tmp/profile"),
+            Path::new("/tmp/picked"),
         );
         let info_idx = args.iter().position(|a| a == "--info").unwrap();
         let info = &args[info_idx + 1];
@@ -2822,6 +2837,7 @@ mod tests {
             Path::new("/tmp/start.jpg"),
             Path::new("/tmp/handoff"),
             Path::new("/tmp/profile"),
+            Path::new("/tmp/picked"),
         );
         let g_idx = args.iter().position(|a| a == "--geometry").unwrap();
         assert_eq!(args[g_idx + 1], FEH_VIEWER_GEOMETRY);
