@@ -8,7 +8,7 @@ Linux-first **feh orchestrator**: browse and select images at scale in a lightwe
 
 ## Why rust-feh? (Security)
 
-rust-feh exists because the legacy **nfeh** (archived at `archive/original-nfeh/`) was both functionally obsolete and a security risk. Codacy scanning of the archived codebase revealed **4 HIGH-severity CVEs** in its 2016-era npm dependency tree — all in `minimatch@3.0.3`:
+rust-feh exists because the legacy **nfeh** (removed from the tree on 2026-11-23, see below) was both functionally obsolete and a security risk. The table below describes the removed archive: Codacy scanning of that codebase had revealed **4 HIGH-severity CVEs** in its 2016-era npm dependency tree — all in `minimatch@3.0.3`:
 
 | CVE | Issue | Severity |
 |-----|-------|----------|
@@ -24,13 +24,13 @@ Patching was infeasible — the entire dependency chain (Electron 1.x, React 15,
 - **Auditable deps** — egui, eframe, walkdir, image crate, rfd, which, arboard, serde, serde_json. All known, verifiable crates
 - **Sandboxed feh integration** — external viewer runs as an unprivileged subprocess
 
-The archived nfeh codebase is preserved only as a reference snapshot and will be removed once rust-feh is fully verified. See [issue #35](https://github.com/kairin/rust-feh/issues/35) for the full audit trail.
+The original nfeh code was removed on 2026-11-23 and is preserved at git tag `archive-original-nfeh-final` (import commit `13f90b1`; upstream https://github.com/fa7ad/nfeh, MIT, © 2016 Fahad Hossain). See [issue #35](https://github.com/kairin/000-222-rust-feh/issues/35) for the full audit trail.
 
 ## Status
 
-From-scratch Rust successor to archived **nfeh** — same broad idea (pick from a folder, act on images), different architecture: feh is actually invoked, lists scale to 10k+ images, and the runtime is a single native binary (egui/eframe, no Electron).
+From-scratch Rust successor to the retired **nfeh** — same broad idea (pick from a folder, act on images), different architecture: feh is actually invoked, lists scale to 10k+ images, and the runtime is a single native binary (egui/eframe, no Electron).
 
-- Original nfeh code lives in `archive/original-nfeh/` until rust-feh is fully verified.
+- The original nfeh code was removed on 2026-11-23; it is preserved at git tag `archive-original-nfeh-final`.
 - **Active product and UX requirements:** [docs/UI-UX-REDESIGN.md](docs/UI-UX-REDESIGN.md) · **Shipped outcomes and retained evidence:** [docs/PROJECT-HISTORY.md](docs/PROJECT-HISTORY.md)
 
 ## Requirements
@@ -232,4 +232,4 @@ see also the [feature 001 report](specs/001-persistent-ui-virtual-browsing/valid
 
 This project is licensed under the MIT License. See [LICENSE](LICENSE).
 
-The archived original nfeh code in `archive/original-nfeh/` keeps its own MIT license, see [archive/original-nfeh/LICENSE.md](archive/original-nfeh/LICENSE.md).
+The original nfeh code (MIT, © 2016 Fahad Hossain, https://github.com/fa7ad/nfeh) was removed from the tree on 2026-11-23. It keeps its own MIT license and is preserved at git tag `archive-original-nfeh-final`.

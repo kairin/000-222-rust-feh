@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 // rust-feh — Fast lightweight GUI for feh + simple image tools
-// All original nfeh / old maintainer code and traces have been archived (see archive/original-nfeh/).
+// All original nfeh / old maintainer code and traces were removed from the tree (history only; see git tag archive-original-nfeh-final).
 
 use eframe::{egui, App, Frame};
 use rust_feh::image_proc::{decode_stage_rgba, process_image, ImageToolsService, ProcessOptions};

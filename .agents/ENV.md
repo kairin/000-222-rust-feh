@@ -21,5 +21,7 @@ Re-verify before relying on anything time-sensitive.
 - Toolchain: Rust stable, edition 2021.
 
 ## Dependabot
-- There is no `.github/dependabot.yml`. Dependabot security PRs come only from
-  `archive/original-nfeh`, the retired nfeh code. Do not treat them as current-app issues.
+- There is no `.github/dependabot.yml`. Dependabot security alerts formerly came
+  only from `archive/original-nfeh`, the retired nfeh code, which was removed on 2026-11-23
+  (preserved at tag `archive-original-nfeh-final`). Those alerts should close; treat any
+  remaining alert as a current-app issue.

@@ -1,7 +1,13 @@
 <!--
   Sync Impact Report
   ==================
-  Version change: 1.0.0 → 1.0.1
+  Version change: 1.0.1 → 1.0.2
+  Reason: PATCH — Archive paragraph updated: original nfeh code removed 2026-11-23 and
+          preserved at tag archive-original-nfeh-final (import commit 13f90b1); module
+          sentence now says modules are exposed as rust_feh::<module> (crate-root
+          re-exports removed in #181). No principles added, removed, or re-defined.
+
+  Previous (1.0.0 → 1.0.1)
   Reason: PATCH — clarify module inventory in Principle III and Technical Standards
           to reflect actual crate layout after features 005/008/009/011/012
           (ui_logic + tool_caps added as core egui-independent modules via lib.rs;
@@ -106,12 +112,10 @@ The application starts fast, scans fast, and stays responsive under large direct
 **License**: MIT — all new code uses SPDX-License-Identifier: MIT headers.
 **Build**: `cargo build --release` produces the binary at `target/release/rust-feh`.
 The `build-and-place.sh` script copies it to the project root.
-**Core modules** (egui-independent, re-exported by `src/lib.rs`): `scanner`,
+**Core modules** (egui-independent, exposed as `rust_feh::<module>` by `src/lib.rs`): `scanner`,
 `image_proc`, `types`, `ui_logic`, `tool_caps`. `src/main.rs` contains only the
 eframe `App` implementation, egui rendering, and orchestration glue.
-**Archive**: The original nfeh code lives in `archive/original-nfeh/` and MUST remain
-there until the new tool is fully verified. No old maintainer artifacts exist in the
-active source tree.
+**Archive**: The original nfeh code (MIT, © 2016 Fahad Hossain, https://github.com/fa7ad/nfeh) was removed from the active tree on 2026-11-23, after feature 019 verification. Tag `archive-original-nfeh-final` holds the last tree that contained it; commit `13f90b1` is the import. No old maintainer artifacts exist in the active source tree.
 
 ## Development Workflow
 
@@ -146,4 +150,4 @@ All PRs and code reviews MUST verify compliance with the constitution. Any
 complexity or dependency that violates a principle MUST be justified in the
 plan's Complexity Tracking table and explicitly approved.
 
-**Version**: 1.0.1 | **Ratified**: 2026-06-21 | **Last Amended**: 2026-06-24
+**Version**: 1.0.2 | **Ratified**: 2026-06-21 | **Last Amended**: 2026-11-23

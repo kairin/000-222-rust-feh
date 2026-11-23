@@ -20,7 +20,7 @@ An optional image-selection report.
 
 Adoption route: **Native retained**. Keep Rust app, exclude archived implementation from site migration.
 
-Proposed artifact input: Approved selection metadata, not archive/original-nfeh. The artifact consumes a read-only snapshot. Canonical authority remains with the originals, ledgers and application stores defined in AGENTS.md. Derived views do not become authoritative records.
+Proposed artifact input: Approved selection metadata, not the removed nfeh archive (tag archive-original-nfeh-final). The artifact consumes a read-only snapshot. Canonical authority remains with the originals, ledgers and application stores defined in AGENTS.md. Derived views do not become authoritative records.
 
 ## Shared tools
 
