@@ -1,3 +1,24 @@
+## [2026-11-23] — Documentation and repository cleanup
+
+Cleanup after a multi-architect staleness audit. It does not change shipped behavior.
+
+### Changed
+
+- Stale images and chat text were removed from the docs. Feature 019 is marked shipped, and feh key `1` is documented (#178).
+- The pre-019 UI/UX baseline moved to `docs/UI-UX-BASELINE-2026-10-05.md` (#184).
+- Stale comments were refreshed, and the stale Quick resize label was renamed (#180).
+- Agent files were refreshed. The global Codex block was removed from `AGENTS.md`, and the stale board, backlog and three unused skills were removed (#182).
+- Repo sudo-askpass helpers and the env secret-loader examples were removed (#183).
+- A root MIT `LICENSE` was added and linked from the README (#185).
+- RHEL 10 `dnf` install steps were verified and added to the README (#186). Item G001 is closed.
+
+### Removed
+
+- Local Spec Kit state was untracked. The stale hermes manifest and orphan scripts were removed (#179).
+- The direct `egui` dependency was dropped (#180).
+- Unused `RenamePattern`, `StagedImage`, pre-cache and materialize APIs, and unused `lib.rs` re-exports were removed (#181).
+- The removal of `archive/original-nfeh` is tracked in its own PR.
+
 ## [2026-11-22] — feh key 1 copies to picked
 
 ### Added
