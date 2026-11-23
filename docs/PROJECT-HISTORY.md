@@ -28,6 +28,8 @@ remain the evidence for shipped behavior.
 | 019 | Browser workspace, resizable/compact preview, visible image actions and on-demand Tools implemented on 2026-10-05. Full tests, clippy and release pass; same-fixture load-only RSS is ~108.5 MiB. Final input-injection and network-folder limitations remain explicit. Merged as #168 on 2026-10-05. | [Current validation and screenshots](../specs/019-browser-first-ux/validation-results.md). |
 | Viewer key 1 | feh key `1` copies the shown image to `~/Pictures/picked` (#177, 2026-11-22). Uses `--action1` with `mkdir -p` and `cp -n`; never overwrites. | `viewer_spawn_command` tests in `src/ui_logic.rs`. |
 
+Related: [Historical pre-019 UI/UX baseline](UI-UX-BASELINE-2026-10-05.md) (stale line references, retired Inspector UI).
+
 ## Decisions retained
 
 - rust-feh orchestrates browsing and actions; feh owns full viewing, navigation and
