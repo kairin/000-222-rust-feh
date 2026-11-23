@@ -217,4 +217,6 @@ see also the [feature 001 report](specs/001-persistent-ui-virtual-browsing/valid
 
 ## License
 
-MIT — fresh copyright for the new project.
+This project is licensed under the MIT License. See [LICENSE](LICENSE).
+
+The archived original nfeh code in `archive/original-nfeh/` keeps its own MIT license, see [archive/original-nfeh/LICENSE.md](archive/original-nfeh/LICENSE.md).
