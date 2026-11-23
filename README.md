@@ -21,7 +21,7 @@ Patching was infeasible — the entire dependency chain (Electron 1.x, React 15,
 
 - **Pure Rust** — no npm, no transitive JS dependency chains, minimal attack surface
 - **No network access** — entire classes of vulnerabilities eliminated by design
-- **Auditable deps** — egui, eframe, walkdir, image crate, rfd, which. All known, verifiable crates
+- **Auditable deps** — egui, eframe, walkdir, image crate, rfd, which, arboard, serde, serde_json. All known, verifiable crates
 - **Sandboxed feh integration** — external viewer runs as an unprivileged subprocess
 
 The archived nfeh codebase is preserved only as a reference snapshot and will be removed once rust-feh is fully verified. See [issue #35](https://github.com/kairin/rust-feh/issues/35) for the full audit trail.
@@ -67,7 +67,7 @@ magick-cache -passkey ~/.magick-cache-passkey create ~/.cache/rust-feh-magick
 
 ### Install Rust (do this first)
 
-Since you saw "cargo not found", install the official toolchain with **rustup** (much better than apt's old cargo):
+If `cargo` is not found, install the official toolchain with **rustup** (newer than the cargo in most distro packages):
 
 ```bash
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
@@ -98,8 +98,6 @@ sudo apt install -y build-essential pkg-config libssl-dev \
 
 ## Libraries & tools
 
-![In-process Rust crates and external PATH tools](docs/assets/readme-libraries.png)
-
 ### In-process (Rust crates)
 
 | Crate | Role |
@@ -109,6 +107,8 @@ sudo apt install -y build-essential pkg-config libssl-dev \
 | **image** | Quick resize for jpg/png/webp |
 | **which** | Detect `feh` / `magick` on PATH |
 | **rfd** | Native “Choose folder” dialog |
+| **arboard** | Clipboard (Copy path, Copy image) |
+| **serde** + **serde_json** | Save and load launch entries and action preferences as JSON |
 
 Core modules: `scanner`, `ui_logic`, `tool_caps`, `image_proc`, `types` (GUI in `main.rs`).
 
@@ -144,12 +144,14 @@ watch -n 1 'ps -o pid,rss,vsz,%cpu,%mem,cmd -p $(pgrep -x rust-feh)'
 
 ![Quick RSS / ps check while 500 images are loaded](docs/assets/readme-resource-ps.png)
 
-**Measured on this machine (metadata-only list, no thumbnails):**
+**Measured on this machine before feature 019 (metadata-only list, no thumbnails):**
 
 | Images loaded | RSS peak | SC-004 goal |
 |---------------|----------|-------------|
 | 1,000 | ~124 MB | < 150 MB — pass |
 | 10,000 | ~126 MB | < 150 MB — pass |
+
+**2026-10-05, after feature 019:** the validation recorded about 108.5 MiB (111,072 KiB) after U3 for a load-only fixture of invalid JPEGs. This is not image-preview decode cost. See [validation-results.md](specs/019-browser-first-ux/validation-results.md).
 
 **Note:** `feh` runs as a **separate process** when you open an image — its memory is not included in `rust-feh` RSS.
 
@@ -163,7 +165,7 @@ cargo run --release
 
 The binary ends up at `target/release/rust-feh`.
 
-To place a copy at the project root (as mentioned in the plan):
+To place a copy at the project root:
 
 ```bash
 ./build-and-place.sh
@@ -181,13 +183,13 @@ Then you can run `./rust-feh` from the root.
 - **Filter and sort**: visible above the central list; Path / Name / Folder sort with scroll reset. Up, current path, List/Tree, and subfolder navigation stay with the browser.
 - **Open folder** loads a folder; native formats (jpg, png, webp, gif, bmp) plus optional ImageMagick identify for unlisted types
 - Select image in list; first image auto-selected on load — **feh does not auto-launch**
-- **Open in feh** and **More** are visible for the current selection; More reuses existing Save a copy, Move to, Resize, Convert, Copy path, and Copy image actions. Open in feh is a round-trip: closing it returns the viewed image to the preview.
+- **Open in feh** and **More** are visible for the current selection; More reuses existing Save a copy, Move to, Resize, Convert, Copy path, and Copy image actions. Open in feh is a round-trip: closing it returns the viewed image to the preview. In the feh window, key `1` copies the shown image to `~/Pictures/picked` (created if missing; `cp -n`, so it never overwrites).
 - The selected image appears in a resizable right Preview; narrow windows switch to the same preview body with a Back to list control. Preview decoding remains asynchronous.
 - Graceful degradation when `feh` is missing (disabled buttons, clear status message)
 - Existing scan settings, Image Tools and pinning, saved feh launches, status/inventory, activity log, format support, and installed-tool recovery are available on demand from **Tools**.
 - **Feh-first scanning**: extension-only scan by default (~milliseconds on large photo folders); list fills incrementally; **Open in feh** works while scan runs; optional “Detect exotic formats (slow)” for ImageMagick deep scan
 - **Background scanning**: UI stays responsive on large or network paths; NAS/GVFS never run per-file ImageMagick identify
-- **Session status** scan pulse + animated dots during scan
+- **Session status**: during a scan the pulse colour changes and a `| / - \` spinner turns
 
 Further work is possible in areas such as thumbnail grid, richer tools, or config, but no specific features are committed.
 

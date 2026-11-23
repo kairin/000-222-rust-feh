@@ -16,7 +16,7 @@ repetitive execution, or Terra directly for implementation and tests. Every
 agent configuration names its model explicitly; workers do not delegate.
 
 <!-- SPECKIT START -->
-For active implementation requirements, read [specs/019-browser-first-ux/plan.md](specs/019-browser-first-ux/plan.md) and its [scope](specs/019-browser-first-ux/spec.md). The current UX architecture authority remains [docs/UI-UX-REDESIGN.md](docs/UI-UX-REDESIGN.md).
+No feature is active. The last shipped feature is 019; its [plan](specs/019-browser-first-ux/plan.md) and [scope](specs/019-browser-first-ux/spec.md) are the UX reference. The current UX architecture authority remains [docs/UI-UX-REDESIGN.md](docs/UI-UX-REDESIGN.md).
 For shipped outcomes and retained historical evidence, read [docs/PROJECT-HISTORY.md](docs/PROJECT-HISTORY.md).
 Feature-specific Spec Kit templates and workflows remain available when creating an
 authorized feature; historical feature plans are not current product requirements.
