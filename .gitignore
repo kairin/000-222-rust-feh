@@ -35,3 +35,6 @@
 
 # Hermes agent scratch (plans/skills), not project deliverables
 .hermes/
+
+# Agent worktrees
+.claude/worktrees/

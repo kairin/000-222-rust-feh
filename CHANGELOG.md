@@ -17,7 +17,7 @@ Cleanup after a multi-architect staleness audit. It does not change shipped beha
 - Local Spec Kit state was untracked. The stale hermes manifest and orphan scripts were removed (#179).
 - The direct `egui` dependency was dropped (#180).
 - Unused `RenamePattern`, `StagedImage`, pre-cache and materialize APIs, and unused `lib.rs` re-exports were removed (#181).
-- The removal of `archive/original-nfeh` is tracked in its own PR.
+- `archive/original-nfeh` was removed (#187). The code is preserved at tag `archive-original-nfeh-final`. The constitution Archive paragraph was amended to 1.0.2.
 
 ## [2026-11-22] — feh key 1 copies to picked
 
