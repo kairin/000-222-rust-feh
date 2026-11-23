@@ -21,14 +21,14 @@ Patching was infeasible — the entire dependency chain (Electron 1.x, React 15,
 
 - **Pure Rust** — no npm, no transitive JS dependency chains, minimal attack surface
 - **No network access** — entire classes of vulnerabilities eliminated by design
-- **Auditable deps** — egui, eframe, walkdir, image crate, rfd, which, arboard, serde, serde_json. All known, verifiable crates
+- **Auditable deps** — eframe (re-exports egui), walkdir, image crate, rfd, which, arboard, serde, serde_json. All known, verifiable crates
 - **Sandboxed feh integration** — external viewer runs as an unprivileged subprocess
 
-The original nfeh code was removed on 2026-11-23 and is preserved at git tag `archive-original-nfeh-final` (import commit `13f90b1`; upstream https://github.com/fa7ad/nfeh, MIT, © 2016 Fahad Hossain). See [issue #35](https://github.com/kairin/000-222-rust-feh/issues/35) for the full audit trail.
+The original nfeh code was removed on 2026-11-23 and is preserved at git tag `archive-original-nfeh-final` (first commit containing it: repository root commit `13f90b1`; upstream https://github.com/fa7ad/nfeh, MIT, © 2016 Fahad Hossain). See [issue #35](https://github.com/kairin/000-222-rust-feh/issues/35) for the full audit trail.
 
 ## Status
 
-From-scratch Rust successor to the retired **nfeh** — same broad idea (pick from a folder, act on images), different architecture: feh is actually invoked, lists scale to 10k+ images, and the runtime is a single native binary (egui/eframe, no Electron).
+From-scratch Rust successor to the retired **nfeh** — same broad idea (pick from a folder, act on images), different architecture: feh is actually invoked, lists scale to 10k+ images, and the runtime is a single native binary (eframe, which re-exports egui; no Electron).
 
 - The original nfeh code was removed on 2026-11-23; it is preserved at git tag `archive-original-nfeh-final`.
 - **Active product and UX requirements:** [docs/UI-UX-REDESIGN.md](docs/UI-UX-REDESIGN.md) · **Shipped outcomes and retained evidence:** [docs/PROJECT-HISTORY.md](docs/PROJECT-HISTORY.md)
@@ -38,6 +38,7 @@ From-scratch Rust successor to the retired **nfeh** — same broad idea (pick fr
 - Rust (stable) — **install via rustup** (see below)
 - `feh` (for viewing): `sudo apt install feh`
   - RHEL 10: no `feh` package exists in the standard, EPEL or RPM Fusion repositories (checked 2026-11-23); build feh from source or put any `feh` on PATH.
+- For the dev scripts in `scripts/`: ripgrep (`sudo apt install ripgrep`; RHEL 10: `sudo dnf install ripgrep`, verified with `dnf repoquery ripgrep`)
 - Optional: `magick` or `convert` (ImageMagick) for more format options in image tools (RHEL 10: `sudo dnf install ImageMagick`, from EPEL)
 - Optional: `magick-cache` (ImageMagick 7+) for persistent cache and **Prepare Fast feh** (see below)
 
@@ -115,9 +116,9 @@ RHEL 10: no `feh` package exists in the standard, EPEL or RPM Fusion repositorie
 
 | Crate | Role |
 |-------|------|
-| **eframe** + **egui** | Native GUI (OpenGL/glow backend) |
+| **eframe** (re-exports egui) | Native GUI (OpenGL/glow backend) |
 | **walkdir** | Recursive folder scan |
-| **image** | Quick resize for jpg/png/webp |
+| **image** | Resize/convert for jpg/png/webp (Image Tools) |
 | **which** | Detect `feh` / `magick` on PATH |
 | **rfd** | Native “Choose folder” dialog |
 | **arboard** | Clipboard (Copy path, Copy image) |
@@ -127,7 +128,7 @@ Core modules: `scanner`, `ui_logic`, `tool_caps`, `image_proc`, `types` (GUI in 
 
 ### External tools (PATH)
 
-The current UI layout and intended redesign are documented in [UI-UX-REDESIGN.md](docs/UI-UX-REDESIGN.md).
+The current UI layout and redesign are documented in [UI-UX-REDESIGN.md](docs/UI-UX-REDESIGN.md).
 
 | Tool | Required? | Role |
 |------|-----------|------|
@@ -142,7 +143,7 @@ After installing a missing tool, use the existing **Recheck tools on PATH** acti
 
 There is no in-app RAM/CPU meter. Use the scripts below (or `ps` / `/proc`) from a second terminal while rust-feh is running.
 
-![Automated resource measurement script output](docs/assets/readme-resource-measure.png)
+![Automated resource measurement script output (pre-019 capture)](docs/assets/readme-resource-measure.png)
 
 ```bash
 # Full protocol: 10k fixture, 60s of samples, PASS/FAIL vs 150 MB goal
@@ -155,7 +156,7 @@ There is no in-app RAM/CPU meter. Use the scripts below (or `ps` / `/proc`) from
 watch -n 1 'ps -o pid,rss,vsz,%cpu,%mem,cmd -p $(pgrep -x rust-feh)'
 ```
 
-![Quick RSS / ps check while 500 images are loaded](docs/assets/readme-resource-ps.png)
+![Quick RSS / ps check while 500 images are loaded (pre-019 capture)](docs/assets/readme-resource-ps.png)
 
 **Measured on this machine before feature 019 (metadata-only list, no thumbnails):**
 
@@ -196,7 +197,7 @@ Then you can run `./rust-feh` from the root.
 - **Filter and sort**: visible above the central list; Path / Name / Folder sort with scroll reset. Up, current path, List/Tree, and subfolder navigation stay with the browser.
 - **Open folder** loads a folder; native formats (jpg, png, webp, gif, bmp) plus optional ImageMagick identify for unlisted types
 - Select image in list; first image auto-selected on load — **feh does not auto-launch**
-- **Open in feh** and **More** are visible for the current selection; More reuses existing Save a copy, Move to, Resize, Convert, Copy path, and Copy image actions. Open in feh is a round-trip: closing it returns the viewed image to the preview. In the feh window, key `1` copies the shown image to `~/Pictures/picked` (created if missing; `cp -n`, so it never overwrites).
+- **Open in feh** and **More** are visible for the current selection; More reuses existing Save a copy, Move to, Resize, Convert, Copy path, and Copy image actions. Open in feh is a round-trip: closing it returns the viewed image to the preview. In a feh window opened with **Open in feh**, key `1` copies the shown image to `~/Pictures/picked` (created if missing; `cp -n`, so it never overwrites). It does not work in Saved feh launches or **Launch feh on optimized**.
 - The selected image appears in a resizable right Preview; narrow windows switch to the same preview body with a Back to list control. Preview decoding remains asynchronous.
 - Graceful degradation when `feh` is missing (disabled buttons, clear status message)
 - Existing scan settings, Image Tools and pinning, saved feh launches, status/inventory, activity log, format support, and installed-tool recovery are available on demand from **Tools**.
