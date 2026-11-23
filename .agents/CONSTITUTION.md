@@ -2,7 +2,7 @@
 
 **Source of truth: `.specify/memory/constitution.md` (v1.0.2, amended 2026-11-23).**
 This file is a summary for agents; when in doubt, read the source. These rules bind
-class-A AND class-B work alike. Every agent reads this file plus its task file before acting.
+class-A AND class-B work alike. Every agent reads this file plus the assigned task description or the feature's tasks.md before acting.
 
 ## The five MUST principles
 

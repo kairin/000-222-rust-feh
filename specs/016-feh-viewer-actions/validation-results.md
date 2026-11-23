@@ -4,12 +4,12 @@
 **Date**: 2026-07-05
 **Tester**: Sonnet orchestrator (scripted), no human-driven click session performed
 **Environment**: Linux desktop (GNOME/Wayland), screenshots forced through XWayland per
-`.agents/ENV.md` (`env -u WAYLAND_DISPLAY` + ImageMagick `import`/`xwininfo`), `rust-feh`
+`.agents/ENV.md` (content removed 2026-11-23; see git history) (`env -u WAYLAND_DISPLAY` + ImageMagick `import`/`xwininfo`), `rust-feh`
 built in release mode (`cargo build --release`).
 
 ## Environment constraint (read first)
 
-Per `.agents/ENV.md`: synthetic input (XTEST) is not delivered under this
+Per `.agents/ENV.md` (content removed 2026-11-23; see git history): synthetic input (XTEST) is not delivered under this
 XWayland/libei-portal setup. This session additionally confirmed **no synthetic-input
 tool is even installed** (`xdotool`, `ydotool`, `wtype` all absent) — so click-driven
 and keystroke-driven interaction with the rust-feh window (selecting a different list
@@ -172,7 +172,7 @@ the existing `scripts/generate-perf-fixture.sh` (10,000 tiny fixture files) and
 | RSS avg | 139.0 MB | — | — |
 | RSS peak | 140.5 MB | < 150 MB (SC-004) | **PASS** |
 
-(`.agents/ENV.md`'s historical baseline for the same protocol was ~126 MB; the small
+(`.agents/ENV.md`'s historical baseline (content removed 2026-11-23; see git history) for the same protocol was ~126 MB; the small
 increase is consistent with the new bounded stage-pane texture cache holding one
 decoded ≤2048px-edge image, not a per-item cost — RSS still comfortably under the
 150 MB ceiling.)

@@ -8,9 +8,6 @@
       "enabled": true,
       "priority": 10,
       "registered_commands": {
-        "hermes": [
-          "speckit.agent-context.update"
-        ],
         "claude": [
           "speckit.agent-context.update"
         ]
