@@ -14,7 +14,7 @@ use std::sync::{mpsc, Arc};
 use std::thread;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-pub const FEH_MISSING_MSG: &str = "feh not found — install with `sudo apt install feh`";
+pub const FEH_MISSING_MSG: &str = "feh not found — install it with your package manager (e.g. `sudo apt install feh` on Debian/Ubuntu; build from source on RHEL, which has no feh package)";
 /// Per-entry launch panel indicator when feh is absent (FR-011).
 pub const FEH_NOT_INSTALLED_LAUNCH_MSG: &str = "feh not installed";
 
@@ -1809,7 +1809,7 @@ mod tests {
         assert_eq!(images.len(), 2);
         assert!(!images
             .iter()
-            .any(|e| e.path == PathBuf::from("/d/only_in_snapshot.png")));
+            .any(|e| e.path == *"/d/only_in_snapshot.png"));
     }
 
     /// (d) A path present only in the snapshot (a moved-/renamed-away file) is NOT
@@ -1835,7 +1835,7 @@ mod tests {
         assert_eq!(images.len(), 1);
         assert!(!images
             .iter()
-            .any(|e| e.path == PathBuf::from("/d/moved_away.png")));
+            .any(|e| e.path == *"/d/moved_away.png"));
     }
 
     /// (e) On a matched entry, only `status` changes — `asset_status` and `size_bytes` are
@@ -1976,7 +1976,7 @@ mod tests {
         let a = dir.join("a.jpg");
         let b = dir.join("sub/b.jpg");
         let paths = [a.as_path(), b.as_path()];
-        let n = write_feh_filelist(&paths).unwrap();
+        let n = write_feh_filelist(paths).unwrap();
         assert_eq!(n, 2);
         let body = std::fs::read_to_string(feh_filelist_temp_path()).unwrap();
         assert!(body.contains(&format!("{}\n", a.display())));

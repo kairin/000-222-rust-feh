@@ -8,7 +8,7 @@ use rust_feh::types::{ImageOperation, OutputPolicy};
 use rust_feh::ui_logic::{add_or_update_asset_in_inventory, apply_rename_pairs};
 use rust_feh::types::{AssetStatus, ImageEntry};
 
-fn make_test_png(dir: &PathBuf) -> PathBuf {
+fn make_test_png(dir: &std::path::Path) -> PathBuf {
     let path = dir.join("test.png");
     let img = image::RgbaImage::from_pixel(32, 32, image::Rgba([255, 0, 0, 255]));
     img.save(&path).unwrap();
@@ -142,7 +142,7 @@ fn prepare_fast_set_idempotent_second_run() {
     let svc = ImageToolsService::new(None);
 
     let start = Instant::now();
-    let set1 = svc.prepare_fast_set(&[src.clone()], &temp).unwrap();
+    let set1 = svc.prepare_fast_set(std::slice::from_ref(&src), &temp).unwrap();
     let first = start.elapsed();
 
     let start2 = Instant::now();

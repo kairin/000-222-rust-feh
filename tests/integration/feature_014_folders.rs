@@ -280,7 +280,7 @@ fn vs_single_open_in_feh_filelist_pattern() {
     let paths: Vec<_> = images.iter().map(|e| e.path.as_path()).collect();
     let list_path = std::env::temp_dir().join("rust-feh-single-open.txt");
     write_feh_filelist_to(&list_path, &paths).unwrap();
-    let mut child = spawn_feh_filelist(&list_path, &paths[0]);
+    let mut child = spawn_feh_filelist(&list_path, paths[0]);
     std::thread::sleep(Duration::from_millis(300));
     assert!(child.try_wait().unwrap().is_none());
     let _ = child.kill();

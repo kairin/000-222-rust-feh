@@ -8,7 +8,7 @@ fn display_available() -> bool {
     std::env::var_os("DISPLAY").is_some() || std::env::var_os("WAYLAND_DISPLAY").is_some()
 }
 
-fn make_test_png(dir: &PathBuf) -> (PathBuf, u32, u32) {
+fn make_test_png(dir: &std::path::Path) -> (PathBuf, u32, u32) {
     let path = dir.join("clipboard-fixture.png");
     let img = image::RgbaImage::from_pixel(17, 11, image::Rgba([40, 80, 120, 255]));
     img.save(&path).unwrap();

@@ -94,7 +94,7 @@ fn processed_add_refreshes_warm_list() {
     let f = Fixture::new();
     let source = f.image("a.png");
     let output = f.image("b.png");
-    let mut app = app(&f.0, &[source.clone()]);
+    let mut app = app(&f.0, std::slice::from_ref(&source));
     assert_eq!(app.compute_list_indices(), (1, vec![0]));
     app.tools_on_processed(processed(&source, &output));
     assert_eq!(app.compute_list_indices(), (2, vec![0, 1]));
@@ -106,7 +106,7 @@ fn processed_add_refreshes_actual_tree_frame() {
     let f = Fixture::new();
     let source = f.image("a.png");
     let output = f.image("b.png");
-    let mut app = app(&f.0, &[source.clone()]);
+    let mut app = app(&f.0, std::slice::from_ref(&source));
     assert_eq!(render_tree(&mut app), vec![source.clone()]);
     app.tools_on_processed(processed(&source, &output));
     assert_eq!(render_tree(&mut app), vec![source, output]);
@@ -117,7 +117,7 @@ fn optimized_add_refreshes_both_caches() {
     let f = Fixture::new();
     let source = f.image("a.png");
     let output = f.image("b.png");
-    let mut app = app(&f.0, &[source.clone()]);
+    let mut app = app(&f.0, std::slice::from_ref(&source));
     assert_eq!(app.compute_list_indices(), (1, vec![0]));
     assert_eq!(render_tree(&mut app), vec![source.clone()]);
     app.tools_finish_prepare_fast(vec![output.clone()], f.0.clone());
@@ -132,7 +132,7 @@ fn derived_action_refreshes_list_tree_and_inventory() {
     let f = Fixture::new();
     let source = f.image("a.png");
     let output = f.0.join("b.png");
-    let mut app = app(&f.0, &[source.clone()]);
+    let mut app = app(&f.0, std::slice::from_ref(&source));
     assert_eq!(app.compute_list_indices(), (1, vec![0]));
     assert_eq!(render_tree(&mut app), vec![source.clone()]);
     app.run_derived_action(
@@ -184,7 +184,7 @@ fn moving_unselected_entry_preserves_selection_and_recounts_converted() {
 fn updating_existing_entry_invalidates_revision_without_duplicates() {
     let f = Fixture::new();
     let source = f.image("a.png");
-    let mut app = app(&f.0, &[source.clone()]);
+    let mut app = app(&f.0, std::slice::from_ref(&source));
     app.images_revision = u64::MAX;
     app.compute_list_indices();
     render_tree(&mut app);
@@ -201,7 +201,7 @@ fn updating_existing_entry_invalidates_revision_without_duplicates() {
 fn moving_final_entry_clears_selection_and_counts() {
     let f = Fixture::new();
     let source = f.image("a.png");
-    let mut app = app(&f.0, &[source.clone()]);
+    let mut app = app(&f.0, std::slice::from_ref(&source));
     app.selected = Some(source.clone());
     app.advance_stage_after_move(&source);
     assert_eq!(app.selected, None);

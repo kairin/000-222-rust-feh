@@ -91,8 +91,8 @@ fn image_dims(path: &Path) -> (u32, u32) {
 
 fn safe_crop_geometry(path: &Path) -> String {
     let (w, h) = image_dims(path);
-    let cw = w.min(480).max(32);
-    let ch = h.min(360).max(32);
+    let cw = w.clamp(32, 480);
+    let ch = h.clamp(32, 360);
     format!("{cw}x{ch}+10+10")
 }
 
