@@ -305,7 +305,7 @@ fn detect_app_state() -> (String, bool, ToolCapabilities) {
     let status = if feh_available {
         String::new()
     } else {
-        "feh not found — install with `sudo apt install feh`".to_string()
+        rust_feh::ui_logic::FEH_MISSING_MSG.to_string()
     };
     (status, feh_available, tool_caps)
 }
@@ -969,7 +969,7 @@ impl RustFehApp {
                         ui.push_id(dep.name, |ui| {
                             if ui.small_button("Copy").clicked() {
                                 ctx.copy_text(dep.install_cmd.to_string());
-                                self.status = format!("Copied install command for {}", dep.name);
+                                self.status = format!("Copied install hint for {}", dep.name);
                             }
                         });
                     });
@@ -4035,7 +4035,7 @@ impl RustFehApp {
     /// feh launches (`launch_entry_feh`/Launch All, `open_feh_on_prepared_fast`)
     /// are unaffected and keep using `spawn_feh_viewer` (fire-and-forget,
     /// byte-identical to pre-feature behavior — US3/T021; this codebase has no
-    /// wallpaper `--bg-fill` spawn site yet, so there's nothing to verify there).
+    /// wallpaper `--bg-fill` spawn site, so there's nothing to verify there).
     fn open_in_feh(&mut self, path: &Path) {
         let (_, indices) = self.compute_list_indices();
         if indices.is_empty() {

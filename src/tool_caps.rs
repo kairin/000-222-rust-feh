@@ -140,7 +140,7 @@ impl ToolCapabilities {
                 binaries: &["feh"],
                 kind: DepKind::Required,
                 role: "View, slideshow",
-                install_cmd: "sudo apt install feh",
+                install_cmd: "Install feh with your package manager (e.g. `sudo apt install feh` on Debian/Ubuntu; build from source on RHEL, which has no feh package)",
                 installed: self.feh_available,
                 resolved_binary: self
                     .feh_available
@@ -151,7 +151,7 @@ impl ToolCapabilities {
                 binaries: &["magick", "convert"],
                 kind: DepKind::Optional,
                 role: "Identify unlisted formats and convert images through Image Tools",
-                install_cmd: "sudo apt install imagemagick",
+                install_cmd: "Install ImageMagick with your package manager (e.g. `sudo apt install imagemagick` on Debian/Ubuntu, `sudo dnf install ImageMagick` on Fedora/RHEL)",
                 installed: self.magick_available,
                 resolved_binary: self.magick_binary.clone(),
             },
@@ -160,7 +160,7 @@ impl ToolCapabilities {
                 binaries: &["magick-cache"],
                 kind: DepKind::Optional,
                 role: "Persistent cache for fast repeats + Prepare Fast feh (optional but recommended)",
-                install_cmd: "Install modern ImageMagick 7+ with cache tools (see README)",
+                install_cmd: "Build MagickCache from source (see docs/MAGICK-CACHE-SETUP.md)",
                 installed: self.magick_cache_available,
                 resolved_binary: self
                     .magick_cache_available
@@ -188,7 +188,7 @@ impl ToolCapabilities {
                 operation: "Browse / filter / sort list",
                 handler: Handler::RustFeh,
                 speed: SpeedTier::Instant,
-                note: "Flat list or folder tree; scan inventory bar",
+                note: "Flat list or folder tree; scan inventory in Tools → Session status and inventory",
             },
             OperationTiming {
                 operation: "Open / slideshow / navigate",

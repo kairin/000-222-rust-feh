@@ -6,7 +6,7 @@ authors = ["rust-feh Developers"]
 description = "Fast lightweight GUI frontend for feh with image tools"
 license = "MIT"
 repository = "https://github.com/kairin/000-222-rust-feh"
-keywords = ["feh", "image", "viewer", "gui", "wallpaper", "linux"]
+keywords = ["feh", "image", "viewer", "gui", "linux"]
 categories = ["gui"]
 
 [dependencies]

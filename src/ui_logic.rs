@@ -14,7 +14,7 @@ use std::sync::{mpsc, Arc};
 use std::thread;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-pub const FEH_MISSING_MSG: &str = "feh not found — install with `sudo apt install feh`";
+pub const FEH_MISSING_MSG: &str = "feh not found — install it with your package manager (e.g. `sudo apt install feh` on Debian/Ubuntu; build from source on RHEL, which has no feh package)";
 /// Per-entry launch panel indicator when feh is absent (FR-011).
 pub const FEH_NOT_INSTALLED_LAUNCH_MSG: &str = "feh not installed";
 
