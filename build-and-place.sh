@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Helper: build rust-feh and place a copy in the project root (for the plan's "output to root" step)
+# Helper: build rust-feh in release mode and copy the binary to the project root
 # Usage: ./build-and-place.sh
 set -euo pipefail
 
@@ -13,5 +13,5 @@ if ! cp target/release/rust-feh ./rust-feh; then
     exit 1
 fi
 
-echo "✅ Binary placed at ./rust-feh (ready for later spec-kit execution)"
+echo "✅ Binary placed at ./rust-feh"
 ls -l ./rust-feh
