@@ -25,7 +25,8 @@ remain the evidence for shipped behavior.
 | 016 | Stage preview, image actions and feh round-trip shipped. Preserve target identity, action safety and round-trip landing. | [Results](../specs/016-feh-viewer-actions/validation-results.md); integration tests. |
 | 017 | Lazy, non-recursive folder scanning and drill-down shipped in the 018 line. Preserve scan cancellation and navigation. Per-entry launch image-count cache remains deferred. | Source/tests; no separate result report. |
 | 018 | Inspector implementation shipped its state, detach and pin safety fixes. Its Inspector-first layout, fixed width, stage-only center, Details drawer and menu exclusivity are superseded by the active redesign. | [Aspect-ratio measurement](../specs/018-inspector-ux-rework/aspect-ratio-evidence.md); source/tests. |
-| 019 | Browser workspace, resizable/compact preview, visible image actions and on-demand Tools implemented on 2026-10-05. Full tests, clippy and release pass; same-fixture load-only RSS is ~108.5 MiB. Final input-injection and network-folder limitations remain explicit. | [Current validation and screenshots](../specs/019-browser-first-ux/validation-results.md). |
+| 019 | Browser workspace, resizable/compact preview, visible image actions and on-demand Tools implemented on 2026-10-05. Full tests, clippy and release pass; same-fixture load-only RSS is ~108.5 MiB. Final input-injection and network-folder limitations remain explicit. Merged as #168 on 2026-10-05. | [Current validation and screenshots](../specs/019-browser-first-ux/validation-results.md). |
+| Viewer key 1 | feh key `1` copies the shown image to `~/Pictures/picked` (#177, 2026-11-22). Uses `--action1` with `mkdir -p` and `cp -n`; never overwrites. | `viewer_spawn_command` tests in `src/ui_logic.rs`. |
 
 ## Decisions retained
 

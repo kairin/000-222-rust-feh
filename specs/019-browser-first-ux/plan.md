@@ -2,7 +2,7 @@
 
 ## Outcome
 
-Move the current virtualized browser into the central workspace, pair it with a resizable right preview, and expose existing selection actions clearly. One Luna owner executes U0-U3 in order; U4 integrated verification remains pending.
+Move the current virtualized browser into the central workspace, pair it with a resizable right preview, and expose existing selection actions clearly. One Luna owner executes U0-U3 in order; U4 integrated verification is complete.
 
 ## Constraints and ownership
 
