@@ -5,19 +5,14 @@
 # project-specific overrides/secrets only.
 # Run `direnv allow` after editing this file or .envrc.local.
 
-source_up
+source_up_if_exists
 
-# Local scripts (validate-*, sudo-askpass helpers)
+# Local scripts (validate-*)
 PATH_add scripts
 
 # Rust toolchain (rustup)
 if [[ -d "${HOME}/.cargo/bin" ]]; then
   PATH_add "${HOME}/.cargo/bin"
-fi
-
-# Optional: GUI askpass for sudo in dev sessions
-if [[ -x "${HOME}/.local/bin/sudo-askpass" ]]; then
-  export SUDO_ASKPASS="${HOME}/.local/bin/sudo-askpass"
 fi
 
 # Load project-local secrets and machine overrides last so they can override/add tokens.

@@ -5,7 +5,7 @@
 #
 # .envrc.local is gitignored — never commit API tokens or passwords.
 #
-# Parent ~/Apps/.envrc.local (via source_up in .envrc) already loads shared
+# Parent ~/Apps/.envrc.local (via source_up_if_exists in .envrc) already loads shared
 # workspace tokens from ~/.dotfiles/ (model API keys, GH_*, HF_*, account-level
 # Context7, Playwright MCP, billing vars, etc.).
 #
@@ -14,20 +14,6 @@
 # This file is loaded after shared workspace env so it can override/add only when needed.
 
 DOTFILES="${DOTFILES:-${HOME}/.dotfiles}"
-
-# Fallback for direct sourcing when parent ~/Apps/.envrc.local was not loaded.
-if ! declare -F load_secret >/dev/null; then
-  load_secret() {
-    local var_name="$1"
-    local token_file="$2"
-    local value
-
-    if [ -r "$token_file" ]; then
-      value="$(LC_ALL=C tr -d '\000\r\n' < "$token_file")"
-      export "$var_name=$value"
-    fi
-  }
-fi
 
 # --- Rust dev ergonomics ---
 export RUST_BACKTRACE="${RUST_BACKTRACE:-1}"
