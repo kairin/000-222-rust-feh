@@ -19,11 +19,6 @@ fn temp_dir(name: &str) -> PathBuf {
 }
 
 #[test]
-fn feature_005_test_harness_exists() {
-    assert!(true);
-}
-
-#[test]
 fn scan_inventory_counts_native_and_skipped() {
     let dir = temp_dir("inventory");
     fs::write(dir.join("photo.jpg"), b"x").unwrap();
