@@ -5,6 +5,11 @@ Re-verify before relying on anything time-sensitive.
 ## Repo
 - Remote: `origin = https://github.com/kairin/000-222-rust-feh.git`. Default branch: `main`.
 - Branch names are `YYYYMMDD-HHMMSS-short-name`. Never delete branches.
+- Remote branches that predate the naming rule are grandfathered and cannot be deleted
+  (checked with `git ls-remote --heads origin` on 2026-11-23): `017-lazy-folder-scanning`,
+  `018-inspector-ux-rework`, `20260819-drop-stale-codacy-token-comment`, `bash-replaces-fish`,
+  `docs/startup-tool-discovery`, `feat/browser-first-ux`, and two `dependabot/npm_and_yarn/...`
+  branches. `main` is the default branch.
 
 ## Spec Kit
 - Version and integration come from `.specify/init-options.json` (`speckit_version`,
