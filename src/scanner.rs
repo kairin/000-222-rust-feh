@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-//! Directory scanner (MVP sync version; will become async + cached + walkdir).
+//! Directory scanner (walkdir-based, with streaming scan support).
 
 use std::io::{self, Read};
 use std::os::fd::OwnedFd;
