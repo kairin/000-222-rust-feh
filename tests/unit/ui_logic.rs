@@ -273,7 +273,7 @@ fn test_decode_image_to_rgba_known_png() {
 
     let (width, height, rgba) = decode_image_to_rgba(&bytes).unwrap();
     assert_eq!((width, height), (2, 1));
-    assert_eq!(rgba.len(), 2 * 1 * 4);
+    assert_eq!(rgba.len(), 2 * 4);
 }
 
 #[test]

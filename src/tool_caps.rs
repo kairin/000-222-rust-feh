@@ -433,8 +433,8 @@ mod tests {
 
     #[test]
     fn is_feh_not_found_detects_no_such_file_message() {
-        use std::io::{Error, ErrorKind};
-        let err = Error::new(ErrorKind::Other, "No such file or directory");
+        use std::io::Error;
+        let err = Error::other("No such file or directory");
         assert!(super::is_feh_not_found(&err));
     }
 
