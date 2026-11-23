@@ -435,9 +435,8 @@ struct RustFehApp {
     /// Set by a cross-folder round-trip landing (Phase 4); consumed by
     /// apply_scan_result so the auto-select-first-image doesn't clobber it.
     pending_select_path: Option<PathBuf>,
-    /// Detached (floating-window) inspector sections (018 Batch 4); replaces
-    /// 7 discrete `*_detached` bools. Absence = docked; presence = detached.
-    /// Carries per-window pin state (018 Batch 5 target pinning).
+    /// Open Tools-menu windows (floating), keyed by section. Presence = the
+    /// window is open. Carries per-window pin state (target pinning).
     detached: HashMap<InspectorSection, DetachedWindow>,
     image_tools: ImageToolsService,
     cache_config: CacheConfig,
@@ -1085,11 +1084,8 @@ impl RustFehApp {
         ui.separator();
     }
 
-    /// Image-actions body + Image Tools, as a single unit (018 Batch 4 parity
-    /// fix): the detached Image-actions window previously showed only the
-    /// body (missing Image Tools) while the docked inspector showed both.
-    /// Both call sites now go through this one function so they can't drift
-    /// apart again.
+    /// Image-actions body + Image Tools, as a single unit, rendered in the
+    /// Tools-menu "Image Tools and pinning" window.
     fn render_image_actions_full(
         &mut self,
         ui: &mut egui::Ui,
@@ -2607,7 +2603,7 @@ impl RustFehApp {
         }
     }
 
-    /// Collapsed inspector headers stay compact (count only); full status lives in the body.
+    /// Session status body shown in the Tools-menu session status window.
     fn render_session_status_body(
         &mut self,
         ui: &mut egui::Ui,
@@ -2972,13 +2968,12 @@ impl RustFehApp {
         }
     }
 
-    /// Zone C (018 Batch 2, PRIMARY): the flat or tree image list, virtualized
-    /// via `show_rows`. Sized to the live remaining inspector height minus the
-    /// flat column-header row and the space Zone D will occupy below it; floored
-    /// at four rows so it never vanishes. Zones A/B were placed earlier in this
-    /// same `ui`, so `ui.available_height()` here already excludes them — no
-    /// fixed banner/subfolder estimate is subtracted (that was the old
-    /// central-panel double-count; see 018 O-review Batch 2 notes).
+    /// The central browser's flat or tree image list, virtualized via
+    /// `show_rows`. Sized to the remaining available height minus the flat
+    /// column-header row; floored at four rows so it never vanishes. Content
+    /// placed earlier in the same `ui` is already excluded from
+    /// `ui.available_height()`, so no fixed banner/subfolder estimate is
+    /// subtracted.
     fn render_inspector_file_list(
         &mut self,
         ui: &mut egui::Ui,

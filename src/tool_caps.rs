@@ -201,7 +201,7 @@ impl ToolCapabilities {
                 },
             },
             OperationTiming {
-                operation: "Quick resize (jpg/png/webp)",
+                operation: "Image Tools (resize/convert, jpg/png/webp)",
                 handler: Handler::ImageCrate,
                 speed: SpeedTier::Medium,
                 note: "Requires a decodable selected image; Image Tools can convert with ImageMagick",
