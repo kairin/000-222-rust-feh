@@ -1,7 +1,7 @@
 # .agents/GUARDRAILS.md — Operational guardrails (bind every phase, every agent)
 
-Violating these is a stop-the-line event. Read alongside `.agents/CONSTITUTION.md` and your
-task file before doing anything.
+Violating these is a stop-the-line event. Read alongside `.agents/CONSTITUTION.md` and the
+assigned task description or the feature's tasks.md before doing anything.
 
 ## Cost governance
 - Before ANY fan-out: lead announces model tier + agent count + rationale.
@@ -24,16 +24,15 @@ task file before doing anything.
 - Never two live agents writing the same file. `tasks.md` files have a single writer: the
   owning orchestrator.
 
-## Security checkpoint (non-negotiable for the integration workstreams)
-- rust-feh exists because nfeh was retired over CVEs (issue #35). Both integrations expand
-  attack surface: caption spawns Python/GPU subprocesses (argument injection, path handling,
-  `direnv exec` trust, HF_TOKEN handling); image-tools dlopens libheif at runtime.
-- `/security-review` runs on each workstream's diff BEFORE merge, with explicit attention to
-  subprocess argument construction, untrusted path handling, and any dlopen loader.
-  A failed security review is a hard block.
-- Additional standing rule: **caption's `batch_caption.py` ships images to a remote HF Space**
-  — any integration of that path is a network-egress + privacy event and must be explicit,
-  opt-in, and documented in the feature spec. rust-feh itself stays no-network.
+## Security checkpoint (standing rule for new subprocess, loader or network work)
+- rust-feh exists because nfeh was retired over CVEs (issue #35). Any change that spawns a
+  new subprocess, loads a native library at runtime, or handles untrusted paths expands
+  attack surface.
+- When a change does any of that, run `/security-review` on its diff BEFORE merge, with
+  explicit attention to subprocess argument construction, untrusted path handling, and any
+  dlopen loader. A failed security review is a hard block.
+- Any feature that sends data over a network is a network-egress + privacy event: it must be
+  explicit, opt-in, and documented in the feature spec. rust-feh itself stays no-network.
 
 ## Repo constraints for all implementers
 - Keep logic OUT of `main.rs` (`src/main.rs` is the largest file; check `wc -l src/main.rs` — biggest liability). Testable homes: `ui_logic.rs`,
@@ -41,13 +40,13 @@ task file before doing anything.
 - 50-line functions, complexity caps. Clippy `-D warnings` (CI runs it). Run `cargo fmt` when available; no workflow step checks it.
 - Small branches, green CI; PR discipline as per repo history.
 
-## Delegation model (Phase 3)
+## Delegation model
 - **Sonnet orchestrator** owns one task set / one class-A feature: decompose, dispatch Haiku,
   integrate, keep the feature's tasks.md checkboxes current.
 - **Haiku implementers**: one well-specified subtask each, small blast radius.
 - **Opus specialist** only on cited triggers: (a) Haiku fails acceptance twice; (b) cross-
-  cutting / architectural / concurrency / security-sensitive change (image-tools merge design,
-  any main.rs restructuring); (c) genuine ambiguity after re-reading the spec; (d) subtask
+  cutting / architectural / concurrency / security-sensitive change (any new runtime
+  loader or subprocess design, any main.rs restructuring); (c) genuine ambiguity after re-reading the spec; (d) subtask
   touches > 5 files or breaks a public contract.
 
 ## Resume durability
