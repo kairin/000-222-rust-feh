@@ -84,7 +84,7 @@ else
 fi
 
 echo "--- Maintainer trace ---"
-# Exclude bare "nfeh" — allowed in archival footer strings (see archive/original-nfeh/).
+# Exclude bare "nfeh" — allowed in historical or archival strings.
 if rg -ri 'fa7ad|fahad|8bit\.demoncoder|gq\.fahad|@fa7ad' src/ >/dev/null 2>&1; then
   fail "maintainer traces in src/"
 else
