@@ -1,7 +1,15 @@
 <!--
   Sync Impact Report
   ==================
-  Version change: 1.0.1 → 1.0.2
+  Version change: 1.0.2 → 1.0.3
+  Reason: PATCH — Development Workflow branching line aligned with the owner's
+          YYYYMMDD-HHMMSS-short-name branch rule and the GitHub branch-naming ruleset
+          (the old ###-feature-name rule could no longer be followed); Principle III now
+          says core modules are used via rust_feh::<module> paths (crate-root re-exports
+          were removed in #181). The specs/###-feature-name/ directory rule is unchanged.
+          No principles added, removed, or re-defined. Approved by the owner.
+
+  Previous (1.0.1 → 1.0.2)
   Reason: PATCH — Archive paragraph updated: original nfeh code removed 2026-11-23 and
           preserved at tag archive-original-nfeh-final (import commit 13f90b1); module
           sentence now says modules are exposed as rust_feh::<module> (crate-root
@@ -25,7 +33,7 @@
     - .specify/templates/constitution-template.md ✅ source of placeholders; no drift introduced
   Runtime guidance & command files reviewed (no edits required):
     - README.md, docs/UI-UX-REDESIGN.md (only reference principles by §I/§III/§IV etc.; module lists are descriptive, not contractual)
-    - AGENTS.md (only SPECKIT markers)
+    - AGENTS.md (title, SPECKIT block, status text outside the markers, Git identity)
     - .specify/extensions/agent-context/commands/speckit.agent-context.update.md (uses generic "coding agent context file" + e.g. examples including CLAUDE.md; no CLAUDE-only guidance)
     - No .specify/templates/commands/*.md directory in this repo (commands provided via extensions/ when needed; checked per skill)
   Follow-up TODOs: none
@@ -74,7 +82,7 @@ core logic; core modules never depend on GUI types.
   magick). Standalone, heavily unit-tested, no GUI, no persistent side effects.
 - `main` — egui/eframe application, UI rendering, user interaction, feh
   subprocess spawn + filelist handoff. Delegates to core modules (via
-  `rust_feh::*` re-exports from `lib.rs`) for all non-UI work. Uses `std::sync::mpsc`
+  `rust_feh::<module>` paths exposed by `lib.rs`) for all non-UI work. Uses `std::sync::mpsc`
   channels today to keep the render loop responsive during background scans.
 - Async/threading concerns MUST be extracted from the GUI into dedicated modules
   when introduced (current channel usage already follows the rule; future
@@ -119,7 +127,8 @@ eframe `App` implementation, egui rendering, and orchestration glue.
 
 ## Development Workflow
 
-- **Branching**: Feature branches from `main`, named `###-feature-name`.
+- **Branching**: Feature branches from `main`, named `YYYYMMDD-HHMMSS-short-name`.
+  The branch name is independent of the spec directory name.
 - **Specs**: Feature specifications live in `specs/###-feature-name/`.
 - **Plan**: Implementation plans are written before coding; the plan includes a
   Constitution Check section verifying alignment with all core principles.
@@ -150,4 +159,4 @@ All PRs and code reviews MUST verify compliance with the constitution. Any
 complexity or dependency that violates a principle MUST be justified in the
 plan's Complexity Tracking table and explicitly approved.
 
-**Version**: 1.0.2 | **Ratified**: 2026-06-21 | **Last Amended**: 2026-11-23
+**Version**: 1.0.3 | **Ratified**: 2026-06-21 | **Last Amended**: 2026-11-23

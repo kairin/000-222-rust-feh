@@ -1,6 +1,6 @@
 ## [2026-11-23] — Documentation and repository cleanup
 
-Cleanup after a multi-architect staleness audit (#178–#189). There is no functional change; one tool label was renamed.
+Cleanup after a multi-architect staleness audit (#178–#193). Behaviour is unchanged. One tool label was renamed, and the in-app install hints are now distro-neutral (#190).
 
 ### Changed
 
@@ -10,6 +10,10 @@ Cleanup after a multi-architect staleness audit (#178–#189). There is no funct
 - Agent files were refreshed. The global Codex block was removed from `AGENTS.md`, and the stale board, backlog and three unused skills were removed (#182).
 - Repo sudo-askpass helpers and the env secret-loader examples were removed (#183). `.envrc.example` now uses `source_up_if_exists`.
 - A root MIT `LICENSE` was added and linked from the README (#185).
+- CI now runs `cargo test --locked` and `cargo clippy --locked --all-targets -- -D warnings` with read-only token permissions, and 17 clippy lints in test code were fixed (#190).
+- The "no active feature" status in `AGENTS.md` moved outside the SPECKIT markers so the agent-context script cannot overwrite it. `GUARDRAILS.md` lost its retired campaign sections (#191).
+- README, CHANGELOG, PROJECT-HISTORY and the UI/UX docs were aligned with the current code (#192).
+- Constitution 1.0.3 (owner approved): feature branches are named `YYYYMMDD-HHMMSS-short-name`, and Principle III names `rust_feh::<module>` paths instead of crate-root re-exports (#193).
 - RHEL 10 `dnf` install steps were verified and added to the README (#186). Item G001 is closed. The README apt package list was aligned to CI (#186).
 - Stale archive wording was fixed, and `.claude/worktrees/` is now ignored (#189).
 - The constitution and docs links to issue #35 were repointed (#187).
