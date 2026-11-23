@@ -21,6 +21,14 @@ sudo apt install -y build-essential git pkg-config automake autoconf libtool \
     libmagickcore-7.q16-dev libmagickwand-7.q16-dev
 ```
 
+Install on RHEL 10 (dnf; needs EPEL for `ImageMagick-devel`). Package names verified; MagickCache build not tested on RHEL:
+
+```bash
+sudo dnf install gcc make git pkgconf-pkg-config automake autoconf libtool ImageMagick-devel
+```
+
+Note: RHEL ships automake 1.16.5, not the `aclocal-1.18` named elsewhere in this guide. The aclocal version differs and was not tested.
+
 Verify headers:
 
 ```bash
@@ -151,7 +159,7 @@ magick-cache -passkey ~/.magick-cache-passkey \
 | Symptom | Fix |
 |---------|-----|
 | `MagickCore >= 7.1.0 ... no` at `./configure` | `sudo apt install libmagickcore-7.q16-dev libmagickwand-7.q16-dev` |
-| `aclocal-1.18: command not found` during `make` | `sudo apt install automake autoconf libtool` |
+| `aclocal-1.18: command not found` during `make` | `sudo apt install automake autoconf libtool` (RHEL: `sudo dnf install automake autoconf libtool`; ships automake 1.16.5, aclocal version differs, not tested) |
 | `magick-cache: command not found` | `sudo make install`; ensure `/usr/local/bin` on PATH or symlink to `/usr/bin` |
 | `libMagickCache.so.0: cannot open shared object file` | `sudo ldconfig` |
 | `magick-cache: ready` never shows | Recheck passkey path; run `identify` manually (above) |
