@@ -37,7 +37,8 @@ From-scratch Rust successor to archived **nfeh** — same broad idea (pick from 
 
 - Rust (stable) — **install via rustup** (see below)
 - `feh` (for viewing): `sudo apt install feh`
-- Optional: `magick` or `convert` (ImageMagick) for more format options in image tools
+  - RHEL 10: no `feh` package exists in the standard, EPEL or RPM Fusion repositories (checked 2026-11-23); build feh from source or put any `feh` on PATH.
+- Optional: `magick` or `convert` (ImageMagick) for more format options in image tools (RHEL 10: `sudo dnf install ImageMagick`, from EPEL)
 - Optional: `magick-cache` (ImageMagick 7+) for persistent cache and **Prepare Fast feh** (see below)
 
 ### Image Tools & Magick Cache
@@ -93,8 +94,20 @@ rustc --version
 ```bash
 sudo apt update
 sudo apt install -y build-essential pkg-config libssl-dev \
-    libxcb1 libxcb-render0 libxcb-shape0 libxcb-xfixes0
+    libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev
 ```
+
+### Optional: system libraries on RHEL 10 (dnf)
+
+Package names below were checked with `dnf repoquery` on RHEL 10.3. `ImageMagick` and `ImageMagick-devel` (7.1.2.35) come from EPEL.
+
+```bash
+sudo dnf install gcc pkgconf-pkg-config openssl-devel libxcb-devel
+# Optional tools: make, git, cargo, clippy, rustfmt, ImageMagick, ImageMagick-devel
+sudo dnf install make git cargo clippy rustfmt ImageMagick ImageMagick-devel
+```
+
+RHEL 10: no `feh` package exists in the standard, EPEL or RPM Fusion repositories (checked 2026-11-23); build feh from source or put any `feh` on PATH. For the MagickCache autotools packages (`automake autoconf libtool`), see [docs/MAGICK-CACHE-SETUP.md](docs/MAGICK-CACHE-SETUP.md).
 
 ## Libraries & tools
 
