@@ -14,7 +14,7 @@ Rules:
   improvise (that is an Opus-escalation trigger, not your call).
 - Keep logic out of `main.rs`; testable homes are `ui_logic.rs`, `image_proc.rs`,
   `tool_caps.rs`, `scanner.rs`, `types.rs`. Functions ≤ 50 lines; clippy must pass
-  with `-D warnings`; `cargo fmt` clean.
+  with `-D warnings` (CI-enforced); `cargo fmt` is not enforced by CI.
 - Write or adjust tests for what you change; run `cargo test` and report actual pass/fail
   output against the acceptance criteria — never "looks done".
 - NEVER commit, push, or open PRs. Your deliverable is the working-tree change + a report:
