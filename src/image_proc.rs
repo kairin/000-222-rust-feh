@@ -210,19 +210,6 @@ impl MagickCacheManager {
             self.config.passkey_path.as_deref(),
         )
     }
-
-    pub fn materialize(&self, iri: &str, dest: &Path) -> Result<PathBuf, String> {
-        if let Some(parent) = dest.parent() {
-            std::fs::create_dir_all(parent).ok();
-        }
-        materialize_from_cache(
-            &self.cache_root(),
-            self.config.passkey_path.as_deref(),
-            iri,
-            dest,
-        )?;
-        Ok(dest.to_path_buf())
-    }
 }
 
 pub fn cache_root_path(config: &crate::types::CacheConfig) -> PathBuf {
@@ -288,35 +275,6 @@ pub fn cache_get(
         Ok(())
     } else {
         Err(format!("magick-cache get miss for {}", iri))
-    }
-}
-
-pub fn materialize_from_cache(
-    cache_root: &Path,
-    passkey: Option<&Path>,
-    iri: &str,
-    dest: &Path,
-) -> Result<(), String> {
-    let dmr_ref = format!("dmr:{iri}");
-    let mut cmd = std::process::Command::new("magick");
-    cmd.arg("convert")
-        .arg("-define")
-        .arg(format!("dmr:path={}", cache_root.display()))
-        .arg("-auto-orient")
-        .arg("-strip")
-        .arg("-quality")
-        .arg("92")
-        .arg(&dmr_ref)
-        .arg(dest);
-    if let Some(pk) = passkey {
-        cmd.arg("-define")
-            .arg(format!("dmr:passkey={}", pk.display()));
-    }
-    let status = cmd.status().map_err(|e| e.to_string())?;
-    if status.success() {
-        Ok(())
-    } else {
-        Err(format!("materialize failed for {}", iri))
     }
 }
 
@@ -674,11 +632,6 @@ impl ImageToolsService {
         }
         let iri = cm.make_iri(source, "originals", "v1");
         cm.put(source, &iri).is_ok()
-    }
-
-    /// Put originals into cache for paths (background-friendly; caller iterates).
-    pub fn pre_cache_paths(&self, sources: &[PathBuf]) -> usize {
-        sources.iter().filter(|src| self.pre_cache_one(src)).count()
     }
 
     /// Materialize one optimized JPEG for feh fast viewing.

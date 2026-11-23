@@ -263,13 +263,6 @@ pub struct PreparedFastSet {
     pub source_folder: std::path::PathBuf,
 }
 
-/// Simple rename pattern (parsed).
-#[derive(Debug, Clone, Default)]
-pub struct RenamePattern {
-    pub raw: String,
-    // Tokens expanded at apply time.
-}
-
 /// Status extension for ImageEntry (for optimized assets).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum AssetStatus {
@@ -287,16 +280,6 @@ pub enum StageState {
     Loading,
     Ready { width: u32, height: u32 },
     Failed { reason: String },
-}
-
-/// The image currently displayed in the rust-feh stage pane (feature 016).
-/// Always mirrors the current selection; `generation` tags decode jobs so only
-/// the latest selection's result is ever applied (stale decodes are discarded).
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct StagedImage {
-    pub path: std::path::PathBuf,
-    pub state: StageState,
-    pub generation: u64,
 }
 
 /// A context-menu action available on the staged image (feature 016, FR-002).
