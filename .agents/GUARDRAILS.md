@@ -14,13 +14,8 @@ task file before doing anything.
 ## Git & commit discipline
 - ONLY orchestrators (Sonnet) and the lead commit. Haiku implementers return diffs; they do
   not commit or push.
-- No push / no PR without maintainer approval (the approved engagement plan of 2026-07-05
-  pre-authorizes: the .specify upgrade PR, task-set branches/PRs for B-2..B-4 and class-A
-  closure, and branch deletion of the 5 audited stale branches — nothing else).
-- **Branch naming ruling (recorded 2026-07-05):** Spec Kit FEATURE branches follow the
-  constitution: `###-feature-name`. Non-feature task-set branches (chore/fix/docs) follow
-  the datetime convention: `YYYYMMDD-HHMMSS-<kind>-<slug>`. This reconciles the constitution
-  with the engagement prompt without amending either; revisit only with the maintainer.
+- No push / no PR without maintainer approval. Never delete branches.
+- Branch names are `YYYYMMDD-HHMMSS-short-name`.
 - Commit a GREEN checkpoint (compiles + tests pass) between task sets.
 
 ## Parallel isolation
@@ -41,14 +36,14 @@ task file before doing anything.
   opt-in, and documented in the feature spec. rust-feh itself stays no-network.
 
 ## Repo constraints for all implementers
-- Keep logic OUT of `main.rs` (3510 lines — biggest liability). Testable homes: `ui_logic.rs`,
+- Keep logic OUT of `main.rs` (`src/main.rs` is the largest file; check `wc -l src/main.rs` — biggest liability). Testable homes: `ui_logic.rs`,
   `image_proc.rs`, `tool_caps.rs`, `scanner.rs`, `types.rs`.
-- 50-line functions, complexity caps. Clippy `-D warnings`. `cargo fmt` clean.
+- 50-line functions, complexity caps. Clippy `-D warnings` (CI runs it). Run `cargo fmt` when available; no workflow step checks it.
 - Small branches, green CI; PR discipline as per repo history.
 
 ## Delegation model (Phase 3)
 - **Sonnet orchestrator** owns one task set / one class-A feature: decompose, dispatch Haiku,
-  integrate, keep task file + BOARD.md (or tasks.md checkboxes) current.
+  integrate, keep the feature's tasks.md checkboxes current.
 - **Haiku implementers**: one well-specified subtask each, small blast radius.
 - **Opus specialist** only on cited triggers: (a) Haiku fails acceptance twice; (b) cross-
   cutting / architectural / concurrency / security-sensitive change (image-tools merge design,
