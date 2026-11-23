@@ -10,7 +10,7 @@ OUT="${1:-docs/assets/readme-screenshot.png}"
 WINDOW_NAME="${2:-rust-feh}"
 
 if ! command -v import >/dev/null 2>&1; then
-  echo "ImageMagick import not found. Install: sudo apt install imagemagick"
+  echo "ImageMagick import not found. install ImageMagick (apt: imagemagick; dnf: ImageMagick)"
   exit 1
 fi
 

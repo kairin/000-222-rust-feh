@@ -10,7 +10,7 @@ Native Rust image browser.
 
 Strength: Native image workflow.
 
-Weakness or limit: Archived web code can mislead discovery.
+Weakness or limit: Archived web code could mislead discovery. Resolved by #187 (archive removed; preserved at tag `archive-original-nfeh-final`).
 
 Evidence below establishes the documented implementation. No runtime performance comparison was completed. Where evidence is incomplete, the first task resolves that gap.
 

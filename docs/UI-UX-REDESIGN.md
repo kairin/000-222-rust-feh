@@ -1,7 +1,7 @@
 # rust-feh UI/UX redesign
 
 **Status:** Active UX authority. The bounded redesign is implemented in [feature 019](../specs/019-browser-first-ux/plan.md); its [validation record](../specs/019-browser-first-ux/validation-results.md) distinguishes verified outcomes from remaining evidence limitations.
-**Date:** 2026-10-05. Source references below describe the inspected baseline at commit ad233f0.
+**Date:** 2026-10-05. Source references describe the inspected baseline at commit ad233f0; see [UI-UX-BASELINE-2026-10-05.md](UI-UX-BASELINE-2026-10-05.md).
 
 This is the active UX authority. It records the current findings, accepted target, protected behavior, implementation packets and evidence. Historical shipped outcomes and retained measurements live in [PROJECT-HISTORY.md](PROJECT-HISTORY.md). Old feature plans and task lists are not current visual requirements.
 
@@ -98,7 +98,7 @@ The user authorized implementation, now recorded as feature 019. These packets r
 
 **Objective:** establish the implementation baseline before application edits.
 
-**Included:** before U1, record the current behavior and a same-build/same-fixture baseline using an existing workload if available; compare current source with Section 10 and note material conflicts; record retired 017/018 visual rules in new feature clarifications; update AGENTS.md plus .specify/feature.json when the new feature is created.
+**Included:** before U1, record the current behavior and a same-build/same-fixture baseline using an existing workload if available; compare current source with the code location index in [UI-UX-BASELINE-2026-10-05.md](UI-UX-BASELINE-2026-10-05.md) (Section 10) and note material conflicts; record retired 017/018 visual rules in new feature clarifications; update AGENTS.md plus .specify/feature.json when the new feature is created.
 
 **Excluded:** application edits, guessing a feature number, changing pointers before feature creation is authorized, replaying historical tasks.
 
@@ -108,7 +108,7 @@ The user authorized implementation, now recorded as feature 019. These packets r
 
 **Stop/escalate:** only for a material source conflict with the accepted outcome or unavailable required write; state the exact conflict or boundary.
 
-**Source seams:** frame ordering and menu/panel layout are RustFehApp::update and render_top_menu_bar/render_inspector_side_panel/render_central_image_panel in src/main.rs. Folder handling is navigate_to_folder/pick_folder; list data is compute_list_indices and ImageListMetrics. The baseline source map is Section 10; use feature 019 and current symbols during implementation.
+**Source seams:** frame ordering and menu/panel layout are RustFehApp::update and render_top_menu_bar/render_inspector_side_panel/render_central_image_panel in src/main.rs. Folder handling is navigate_to_folder/pick_folder; list data is compute_list_indices and ImageListMetrics. The baseline source map is the code location index in [UI-UX-BASELINE-2026-10-05.md](UI-UX-BASELINE-2026-10-05.md) (Section 10); seam names are pre-019; several were removed in 019. Use feature 019 and current symbols during implementation.
 
 ### 6.2 U1 — Make the browser the useful workspace
 
@@ -126,7 +126,7 @@ The user authorized implementation, now recorded as feature 019. These packets r
 
 **Stop/escalate:** only for a measured conflict among virtualization, bounded layout and supported minimum size; report the case and alternatives.
 
-**Ordered steps:** (1) preserve frame ordering constraints and place browser controls, (2) move existing list/subfolder renderers without rewriting cache/row logic, (3) add preview sizing and narrow fallback with one instance, (4) add/resolve state display from existing scan and stage state. **Source seams:** src/main.rs render_inspector_nav_strip, render_inspector_subfolder_drilldown, render_inspector_file_list, render_flat_image_list, render_tree_image_list, render_stage_pane, kick_stage_decode_if_selection_changed, poll_stage_decode, and update; src/ui_logic.rs compute/filter/sort/tree helpers. **Worker return:** changed paths, state transitions, screenshots/interactions, tests run and remaining evidence gaps.
+**Ordered steps:** (1) preserve frame ordering constraints and place browser controls, (2) move existing list/subfolder renderers without rewriting cache/row logic, (3) add preview sizing and narrow fallback with one instance, (4) add/resolve state display from existing scan and stage state. **Source seams (pre-019 names; see [baseline](UI-UX-BASELINE-2026-10-05.md)):** src/main.rs render_inspector_nav_strip, render_inspector_subfolder_drilldown, render_inspector_file_list, render_flat_image_list, render_tree_image_list, render_stage_pane, kick_stage_decode_if_selection_changed, poll_stage_decode, and update; src/ui_logic.rs compute/filter/sort/tree helpers. **Worker return:** changed paths, state transitions, screenshots/interactions, tests run and remaining evidence gaps.
 
 ### 6.3 U2 — Make selection actions clear and safe
 
@@ -142,7 +142,7 @@ The user authorized implementation, now recorded as feature 019. These packets r
 
 **Stop/escalate:** only for unresolved ambiguity over live versus pinned target; identify handler and state path.
 
-**Ordered steps:** (1) map each existing context action to its current handler, (2) expose Open in feh and More actions on preview, (3) audit target resolution at each call site, (4) repair only the capability predicate and add focused cases. **Source seams:** src/main.rs render_image_context_menu, render_image_actions_body, render_image_actions_full, action_* methods, open_in_feh/open_in_feh_pinned; src/ui_logic.rs file_status_decodable and PanelContext; tests/integration/feature_016_actions.rs and feature_016_roundtrip.rs, tests/unit/ui_logic.rs. **Worker return:** action-to-handler map, target-safety audit, test output and actual visible-control interaction evidence.
+**Ordered steps:** (1) map each existing context action to its current handler, (2) expose Open in feh and More actions on preview, (3) audit target resolution at each call site, (4) repair only the capability predicate and add focused cases. **Source seams (pre-019 names; see [baseline](UI-UX-BASELINE-2026-10-05.md)):** src/main.rs render_image_context_menu, render_image_actions_body, render_image_actions_full, action_* methods, open_in_feh/open_in_feh_pinned; src/ui_logic.rs file_status_decodable and PanelContext; tests/integration/feature_016_actions.rs and feature_016_roundtrip.rs, tests/unit/ui_logic.rs. **Worker return:** action-to-handler map, target-safety audit, test output and actual visible-control interaction evidence.
 
 ### 6.4 U3 — Keep tools and recovery reachable
 
@@ -158,7 +158,7 @@ The user authorized implementation, now recorded as feature 019. These packets r
 
 **Stop/escalate:** only if a current capability has no reachable route; report capability, handler and smallest possible presentation.
 
-**Ordered steps:** (1) inventory current Details drawer contents, (2) assign each capability an existing reachable control, (3) relocate/reuse render bodies, (4) remove drawer and obsolete height math, (5) exercise recovery routes. **Source seams:** src/main.rs render_inspector_sections_drawer_body, render_session_status_body, render_activity_log_body, render_deps_section_body, render_format_discovery_body, render_inspector_feh_instances, render_inspector_image_tools, detached-window rendering; src/ui_logic.rs AutoExpandState and drawer height helpers. **Worker return:** capability-location map, removed old-layout references, interaction evidence and tests.
+**Ordered steps:** (1) inventory current Details drawer contents, (2) assign each capability an existing reachable control, (3) relocate/reuse render bodies, (4) remove drawer and obsolete height math, (5) exercise recovery routes. **Source seams (pre-019 names; see [baseline](UI-UX-BASELINE-2026-10-05.md)):** src/main.rs render_inspector_sections_drawer_body, render_session_status_body, render_activity_log_body, render_deps_section_body, render_format_discovery_body, render_inspector_feh_instances, render_inspector_image_tools, detached-window rendering; src/ui_logic.rs AutoExpandState and drawer height helpers. **Worker return:** capability-location map, removed old-layout references, interaction evidence and tests.
 
 ### 6.5 U4 — Integrated evidence and current documentation
 
@@ -209,7 +209,7 @@ Render top/bottom/side panels before CentralPanel. Preserve bounded list height,
 | D8 | Operation-specific target capability; inventory labels must not promise decode readiness. |
 | D9 | Reuse existing render bodies and handlers; add no dependency/framework/module solely for presentation. |
 
-These decisions govern feature 019. Implementation status and observed results live in its [validation record](../specs/019-browser-first-ux/validation-results.md); baseline descriptions and code references below remain dated evidence.
+These decisions govern feature 019. Implementation status and observed results live in its [validation record](../specs/019-browser-first-ux/validation-results.md); baseline descriptions and code references remain dated evidence in [UI-UX-BASELINE-2026-10-05.md](UI-UX-BASELINE-2026-10-05.md).
 
 ### Follow-up: semantic access for agents
 

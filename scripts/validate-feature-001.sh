@@ -4,7 +4,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
-FEATURE="specs/001-persistent-ui-virtual-browsing"
+command -v rg >/dev/null || { echo "ripgrep (rg) is required"; exit 2; }
 RESULTS="${RUST_FEH_VALIDATION_RESULTS:-${TMPDIR:-/tmp}/rust-feh-feature-001-validation-results.md}"
 PASS=0
 FAIL=0
