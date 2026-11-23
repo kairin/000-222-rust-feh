@@ -1,8 +1,8 @@
 # Website artifact readiness and repairs
 
-Status: open findings or validation gaps. Assessment date: 2026-10-11.
+Status: no open tracked items; G001 closed 2026-11-23. Assessment date: 2026-10-11.
 
-The shared baseline recorded **0 source observations** and **1 missing checks** for this repository. This is not a complete application test.
+The shared baseline recorded **0 source observations** and **1 missing check** for this repository (G001, since closed). This is not a complete application test.
 
 The intent to adopt shared artifact tooling includes fixing known relevant problems first. A successful website build does not erase source or validation failures.
 
@@ -10,7 +10,7 @@ The intent to adopt shared artifact tooling includes fixing known relevant probl
 
 | ID | Priority | Location or gap | Rule | Required action | Status |
 |---|---|---|---|---|---|
-| 000-222-rust-feh:G001 | G | Rust/TypeScript/JSX need the project's documented local compiler/type checks | coverage | Run the project documented compiler/type checks in a supported environment. Record commands, versions and results. | closed 2026-11-23: GitHub Actions CI on main 979b658, run 45184480685, conclusion success; commands `cargo test --verbose` and `cargo clippy -- -D warnings` both passed (stable toolchain on ubuntu runner). Owner reviews at merge. |
+| 000-222-rust-feh:G001 | G | Rust/TypeScript/JSX need the project's documented local compiler/type checks | coverage | Run the project documented compiler/type checks in a supported environment. Record commands, versions and results. | closed 2026-11-23: GitHub Actions CI on main 979b658, run 45184480685, conclusion success; commands `cargo test --verbose` and `cargo clippy -- -D warnings` both passed (stable toolchain on ubuntu runner). TypeScript/JSX not applicable: the web archive was removed in #187. Owner reviews at merge. |
 
 ## Repair sequence and closure
 
