@@ -13,7 +13,5 @@
 # for THIS repo only. Workspace-wide model API keys stay parent-only.
 # This file is loaded after shared workspace env so it can override/add only when needed.
 
-DOTFILES="${DOTFILES:-${HOME}/.dotfiles}"
-
 # --- Rust dev ergonomics ---
 export RUST_BACKTRACE="${RUST_BACKTRACE:-1}"
