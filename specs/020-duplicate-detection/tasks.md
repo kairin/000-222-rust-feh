@@ -16,7 +16,7 @@
 
 ## Phase 1: Baseline and Setup
 
-- [x] T001 [Role: Orchestrator | Write: none | Deps: none] Run `cargo test --locked` and `cargo clippy --locked --all-targets -- -D warnings` on the timestamped feature branch, and record baseline pass counts. Stop if baseline checks fail. *(Baseline: `cargo test --locked` passed across all targets — 128 lib, 2 ignored, plus all integration/unit/perf binaries; `cargo clippy` not installed locally per `.agents/ENV.md`.)*
+- [x] T001 [Role: Orchestrator | Write: none | Deps: none] Run `cargo test --locked` and `cargo clippy --locked --all-targets -- -D warnings` on the timestamped feature branch, and record baseline pass counts. Stop if baseline checks fail. *(Baseline: `cargo test --locked` passed across all targets with 128 lib tests, 2 ignored, and all integration/unit/perf binaries. `cargo clippy` is not installed locally per `.agents/ENV.md`.)*
 
 ---
 
@@ -88,6 +88,17 @@ After `T003` passes, the orchestrator may run **Stream 3A** (`T004 -> T005`), **
 
 ---
 
+## Phase 8: Post-Sweep Remediations and Canonical Documentation Closeout
+
+- [x] T017 [P] [Role: Worker (Haiku/Luna) | Write: `src/scanner.rs`, `src/ui_logic.rs`, `tests/unit/ui_logic.rs` | Deps: `T016`] Expose `pub(crate) fn pick_default_keep` in `src/scanner.rs` without extra path clones. Delegate `ui_logic::default_keep_for_group` to it, and add `format_byte_size` unit tests.
+- [x] T018 [P] [Role: Worker (Haiku/Luna) | Write: `src/main.rs` | Deps: `T016`] Rewrite the `render_detached_inspector_windows` doc comment in ASD-STE100 prose with zero em-dashes. Update the section count from 7 to 8.
+- [x] T019 [P] [Role: Worker (Haiku/Luna) | Write: `README.md` | Deps: `T016`] Update the `README.md` standalone `feh` round-trip note and `Duplicates` row-click preview text. Lint modified lines with `ste-lint.py`.
+- [x] T020 [P] [Role: Worker (Haiku/Luna) | Write: `docs/UI-UX-REDESIGN.md`, `AGENTS.md`, `specs/020-duplicate-detection/plan.md` | Deps: `T017`, `T018`, `T019`] Mark Feature 020 implemented on branch in `docs/UI-UX-REDESIGN.md` and `AGENTS.md`. Sync signatures in `plan.md` and pass `ste-lint.py`.
+- [x] T021 [P] [Role: Worker (Haiku/Luna) | Write: `docs/PROJECT-HISTORY.md` | Deps: `T017`, `T018`, `T019`] Add row `020` to the feature ledger in `docs/PROJECT-HISTORY.md` with a `validation-results.md` link. Lint the new row with `ste-lint.py`.
+- [x] T022 [Role: Worker (Haiku/Luna) | Write: `specs/020-duplicate-detection/validation-results.md` | Deps: `T020`, `T021`] Sync exact `file:line` citations and test counts in `validation-results.md`. Add `Closeout Sweep Dispositions` and pass full-file `ste-lint.py`.
+
+---
+
 ## Dependencies and Execution Order
 
 1. `T001` -> `T002` -> `T003` (Sequential foundation).
@@ -98,3 +109,4 @@ After `T003` passes, the orchestrator may run **Stream 3A** (`T004 -> T005`), **
 3. `T009` -> `T010` (After `T005` and `T008` merge).
 4. `T011` -> `T012` -> `T013` (Single sequential `src/main.rs` owner after `T006` and `T010`).
 5. `T014` and `T015` (Parallel after `T013`), then `T016` (Final gate).
+6. Phase 8 closeout waves: Wave 1 (`T017`, `T018`, `T019` in parallel), Wave 2 (`T020`, `T021` in parallel), then Wave 3 (`T022`).

@@ -45,15 +45,18 @@ Add on-demand exact duplicate detection, full-size group inspection in `feh`, a 
   - `ActionKind::QuarantineDuplicate` (keeps `ContextAction` at its six staged-image variants).
 - **`src/scanner.rs`**:
   - `pub fn find_exact_duplicates_streaming(candidates: &[PathBuf], current_dir: Option<&Path>, generation: u64, cancel: &AtomicBool, tx: &mpsc::Sender<DuplicateScanMsg>) -> DuplicateScanSummary`
+  - `pub(crate) fn pick_default_keep(members: &[PathBuf], current_dir: Option<&Path>) -> HashSet<PathBuf>`
 - **`src/ui_logic.rs`**:
   - `InspectorSection::Duplicates` (`InspectorSection::ALL` grows from 7 to 8 entries)
-  - `pub fn default_keep_for_group(members: &[PathBuf], root: Option<&Path>) -> HashSet<PathBuf>`
+  - `pub fn default_keep_for_group(members: &[PathBuf], root: Option<&Path>) -> HashSet<PathBuf>` (delegates to `scanner::pick_default_keep`)
   - `pub fn toggle_group_keep(group: &mut DuplicateGroup, candidate: &Path) -> bool`
   - `pub fn active_duplicate_path_set(groups: &[DuplicateGroup]) -> HashSet<PathBuf>`
   - `pub fn list_indices_with_duplicates(images: &[ImageEntry], root: Option<&Path>, search: &str, sort: SortMode, duplicate_paths: Option<&HashSet<PathBuf>>) -> Vec<usize>`
   - `pub fn tree_visible_rows_with_duplicates(images: &[ImageEntry], root: Option<&Path>, search: &str, sort: SortMode, expanded: &HashSet<String>, root_skipped: usize, duplicate_paths: Option<&HashSet<PathBuf>>) -> Vec<TreeRow>`
   - `pub fn feh_duplicate_group_filelist_path(cache_dir: &Path, pid: u32) -> PathBuf`
+  - `pub fn feh_duplicate_temp_path() -> PathBuf`
   - `pub fn duplicate_group_spawn_command(filelist_path: &Path, members: &[PathBuf]) -> Result<(String, Vec<String>), String>`
+  - `pub fn format_byte_size(bytes: u64) -> String`
   - `pub fn resolve_quarantine_dir(current_dir: &Path, mode: &QuarantineMode) -> PathBuf`
   - `pub fn quarantine_group_extras(group: &DuplicateGroup, dest_dir: &Path) -> Vec<(PathBuf, Result<PathBuf, String>)>`
   - `pub fn prune_duplicate_groups_after_moves(groups: &mut Vec<DuplicateGroup>, moved_sources: &HashSet<PathBuf>, root: Option<&Path>)`
@@ -78,6 +81,7 @@ Add on-demand exact duplicate detection, full-size group inspection in `feh`, a 
 - **Flat and Tree caches**: `ListIndexKey` and `compute_list_indices` in `src/main.rs:370, 577-607`. `TreeRowsKey` and `tree_rows_cache` in `src/main.rs:386, 475-477, 3226-3251`. `list_indices` and `tree_visible_rows` in `src/ui_logic.rs:642, 955`.
 - **Activity, rescan, and shutdown hooks**: `is_activity_busy` in `src/main.rs:879-881`, `scan_directory` in `src/main.rs:3879`, and `Drop for RustFehApp` in `src/main.rs:556-565`.
 - **Loss-proof move and selection**: `plan_loss_proof_move` and `execute_move_plan` in `src/ui_logic.rs:1532-1610`. `advance_stage_after_move` in `src/main.rs:3663-3681`.
+- **Duplicate row preview selection**: `DuplicateCardAction::Select(PathBuf)` in `src/main.rs:509, 1173, 1270` handles duplicate-row click-to-preview selection.
 - **Integration test target**: Attach new integration tests as a submodule inside `tests/integration/feature_016_actions.rs` so `Cargo.toml` (`[[test]]` list at lines 40-74) stays untouched.
 
 ## Complexity Tracking

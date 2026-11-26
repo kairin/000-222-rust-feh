@@ -1726,13 +1726,7 @@ impl InspectorSection {
 }
 
 pub fn default_keep_for_group(members: &[PathBuf], root: Option<&Path>) -> HashSet<PathBuf> {
-    let best = members.iter().min_by_key(|path| {
-        let rel = root
-            .and_then(|r| path.strip_prefix(r).ok())
-            .unwrap_or(path.as_path());
-        (rel.components().count(), rel.as_os_str().len(), *path)
-    });
-    best.cloned().into_iter().collect()
+    crate::scanner::pick_default_keep(members, root)
 }
 
 pub fn active_duplicate_path_set(groups: &[DuplicateGroup]) -> HashSet<PathBuf> {

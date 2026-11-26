@@ -364,11 +364,14 @@ fn filter_duplicate_candidates(candidates: &[PathBuf], current_dir: Option<&Path
     filtered
 }
 
-fn pick_default_keep(members: &[PathBuf], current_dir: Option<&Path>) -> HashSet<PathBuf> {
+pub(crate) fn pick_default_keep(
+    members: &[PathBuf],
+    current_dir: Option<&Path>,
+) -> HashSet<PathBuf> {
     let mut keep = HashSet::new();
     if let Some(best) = members.iter().min_by_key(|p| {
         let rel = current_dir.and_then(|r| p.strip_prefix(r).ok()).unwrap_or(p);
-        (rel.components().count(), rel.as_os_str().len(), (*p).clone())
+        (rel.components().count(), rel.as_os_str().len(), *p)
     }) {
         keep.insert(best.clone());
     }

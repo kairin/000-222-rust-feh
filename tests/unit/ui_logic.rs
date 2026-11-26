@@ -12,7 +12,8 @@ use rust_feh::ui_logic::{
     active_duplicate_path_set, add_or_update_asset_in_inventory, aggregate_batch_results,
     build_entry_filelist, compute_output_path, copy_image_to_clipboard, crop_preview_pixels,
     decode_image_to_rgba, default_keep_for_group, duplicate_group_spawn_command,
-    entry_is_launchable, expand_rename_pattern, feh_duplicate_group_filelist_path, list_indices,
+    entry_is_launchable, expand_rename_pattern, feh_duplicate_group_filelist_path,
+    format_byte_size, list_indices,
     list_indices_with_duplicates, list_subfolders, load_launch_list, load_window_prefs,
     process_actions_enabled_for_selection, save_launch_list, save_window_prefs,
     stage_preview_status, tree_visible_rows, tree_visible_rows_with_duplicates,
@@ -553,4 +554,12 @@ fn duplicate_group_spawn_command_validates_and_writes_filelist() {
         .collect();
     assert_eq!(written, vec![p1.display().to_string(), p2.display().to_string()]);
     let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn format_byte_size_formats_zero_b_kib_and_mib() {
+    assert_eq!(format_byte_size(0), "0 B");
+    assert_eq!(format_byte_size(512), "512 B");
+    assert_eq!(format_byte_size(2048), "2.0 KiB");
+    assert_eq!(format_byte_size(3 * 1024 * 1024), "3.0 MiB");
 }

@@ -8,11 +8,12 @@ at specs/020-duplicate-detection/plan.md
 
 ## Current status
 
-Active authorized feature: `020-duplicate-detection` ([spec](specs/020-duplicate-detection/spec.md), [plan](specs/020-duplicate-detection/plan.md), [tasks](specs/020-duplicate-detection/tasks.md)). The shipped browser-first UX baseline is 019 ([plan](specs/019-browser-first-ux/plan.md), [scope](specs/019-browser-first-ux/spec.md)). The UX architecture authority remains [docs/UI-UX-REDESIGN.md](docs/UI-UX-REDESIGN.md).
+Feature `020-duplicate-detection` is implemented and verified on branch, pending PR merge closeout. See [spec](specs/020-duplicate-detection/spec.md), [plan](specs/020-duplicate-detection/plan.md), [tasks](specs/020-duplicate-detection/tasks.md), and [validation](specs/020-duplicate-detection/validation-results.md). The shipped browser-first UX baseline is 019 ([plan](specs/019-browser-first-ux/plan.md), [scope](specs/019-browser-first-ux/spec.md)). The UX architecture authority remains [docs/UI-UX-REDESIGN.md](docs/UI-UX-REDESIGN.md).
 For shipped outcomes and retained historical evidence, read [docs/PROJECT-HISTORY.md](docs/PROJECT-HISTORY.md).
+
 Feature-specific Spec Kit templates and workflows remain available when creating an
-authorized feature; historical feature plans are not current product requirements.
-Branch naming, never-delete, commit/push and test rules are routed from [.agents/ROUTING.md](.agents/ROUTING.md).
+authorized feature. Historical feature plans are not current product requirements.
+Branch naming, never-delete, commit/push and test rules route from [.agents/ROUTING.md](.agents/ROUTING.md).
 
 ## Git identity
 

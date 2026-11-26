@@ -221,16 +221,16 @@ Astra's bounded architecture review accepted this approach. Start with an existi
 
 On 2026-10-05, a read-only check returned `IsEnabled=false` and `ScreenReaderEnabled=false` from the local accessibility service. No desktop setting was changed, and no semantic interaction pass is claimed. This investigation does not add a dependency, service, browser migration or acceptance gate to the current UI redesign.
 
-### Authorized follow-up: Feature 020 (exact duplicate detection and quarantine)
+### Implemented on branch: Feature 020 (exact duplicate detection and quarantine)
 
-The owner authorized feature `020-duplicate-detection` on 2026-11-26. See [spec.md](../specs/020-duplicate-detection/spec.md), [plan.md](../specs/020-duplicate-detection/plan.md), and [tasks.md](../specs/020-duplicate-detection/tasks.md). This feature preserves invariants `K1` through `K10` and decisions `D0` through `D9`.
+Feature `020-duplicate-detection` is implemented and verified on branch (`20261126-152214-duplicate-detection`). See [spec.md](../specs/020-duplicate-detection/spec.md), [plan.md](../specs/020-duplicate-detection/plan.md), [tasks.md](../specs/020-duplicate-detection/tasks.md), and [validation-results.md](../specs/020-duplicate-detection/validation-results.md). This feature keeps invariants `K1` through `K10` and decisions `D0` through `D9`.
 
 | ID | Decision |
 |----|----------|
-| D10 | Open duplicate controls from `Tools -> Duplicates` via `InspectorSection::Duplicates`. Add no third permanent pane. |
-| D11 | Keep folder opening metadata-free (`K4`). Run exact scans on demand in a cancellable thread (`std` size, prefix, and chunk checks). Add no new crate in v1. |
-| D12 | Show a `Duplicates only` filter toggle when results match `images_revision`. Clear results when the folder or list changes. |
-| D13 | Never delete files in `rust-feh`. Verify groups with `Open group in feh`, then move selected extras via `plan_loss_proof_move` and `execute_move_plan`. Keep at least one `Keep` file per group. |
+| D10 | Start duplicate controls on demand from `Tools -> Duplicates` via `InspectorSection::Duplicates`. Add no third permanent pane. |
+| D11 | Keep folder opening metadata-free (`K4`). Run the 3-stage `std` exact byte-duplicate scan (size/inode, 4 KiB header, 1-FD 64 KiB chunks) in a cancellable thread. Add zero new crates. |
+| D12 | Show a `Duplicates only` toggle matched to `images_revision` across Flat list and Folder tree. Clear the toggle when pruning removes the last group, or when the folder or list changes. |
+| D13 | Click a candidate row to select the image in Preview with decoded dimensions. Launch a standalone `feh --filelist` window via `Open group in feh`. Move extras sequentially with collision-safe `plan_loss_proof_move` and `execute_move_plan` to `<current_dir>/duplicates` or a chosen folder. Keep at least one `Keep` file per group, and delete zero files. |
 
 ---
 

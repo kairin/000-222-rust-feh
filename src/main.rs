@@ -3146,15 +3146,16 @@ impl RustFehApp {
         }
     }
 
-    /// Detached (floating) inspector windows: one per `InspectorSection`
-    /// present in `self.detached`. Iterates `InspectorSection::ALL` (NEVER
-    /// the `HashMap`, whose iteration order is unspecified) so window
-    /// spawn/z-order is deterministic frame to frame. Body dispatch is a
-    /// `match` (not fn pointers — a `[fn(&mut Self, ...); 7]` table can't
-    /// paper over the differing per-section arg lists — e.g. session status
-    /// needs `shown`/`total`/`time` — without a wrapper closure per entry
-    /// anyway, so a direct `match` is both simpler and avoids `&mut self`
-    /// fn-pointer variance pain).
+    /// This method renders one detached window for each `InspectorSection` in
+    /// `self.detached`. It iterates `InspectorSection::ALL` instead of the
+    /// `HashMap` because the `HashMap` has no fixed order. This keeps spawn
+    /// order and z-order deterministic on each frame.
+    ///
+    /// Body dispatch uses a `match` on `InspectorSection` instead of a
+    /// `[fn(&mut Self, ...); 8]` table. Sections take different arguments, such
+    /// as `shown`, `total`, and `time` for session status. A table needs a
+    /// wrapper closure for each of the 8 sections. A direct `match` is simpler
+    /// and avoids `&mut Self` lifetime variance and borrow-checker errors.
     fn render_detached_inspector_windows(&mut self, ctx: &egui::Context) {
         let time = ctx.input(|i| i.time);
         let (total, filtered) = self.compute_list_indices();
