@@ -1376,6 +1376,7 @@ fn action_kind_label(kind: &ActionKind) -> &'static str {
         ActionKind::Context(ContextAction::CopyPath) => "Copy path",
         ActionKind::Context(ContextAction::CopyImage) => "Copy image",
         ActionKind::RoundTrip => "Round trip",
+        ActionKind::QuarantineDuplicate => "Quarantine duplicate",
     }
 }
 
@@ -2712,6 +2713,23 @@ mod tests {
                 assert_ne!(labels[i], labels[j], "labels should be distinct");
             }
         }
+    }
+
+    #[test]
+    fn format_action_outcome_quarantine_duplicate() {
+        let outcome = ActionOutcome {
+            action: ActionKind::QuarantineDuplicate,
+            image: PathBuf::from("/a/dup.jpg"),
+            destination: Some(PathBuf::from("/a/duplicates/dup.jpg")),
+            result: ActionResult::Ok {
+                produced: Some(PathBuf::from("/a/duplicates/dup.jpg")),
+            },
+        };
+
+        let formatted = format_action_outcome(&outcome);
+
+        assert!(formatted.starts_with("Quarantine duplicate: "));
+        assert!(formatted.contains("/a/dup.jpg -> /a/duplicates/dup.jpg"));
     }
 
     // ---- Feature 016 T015: viewer_spawn_command (argument-vector safety) ----

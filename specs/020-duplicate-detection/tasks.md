@@ -24,11 +24,11 @@
 
 ### Tests for Phase 2 (Write FIRST and confirm compile/test failure before T003)
 
-- [ ] T002 [Role: Worker (Haiku/Luna) | Write: `src/types.rs` | Deps: `T001`] Add unit tests in `src/types.rs` for `DuplicateGroup`, `DuplicateScanSummary`, `DuplicateScanMsg`, `QuarantineMode::default()`, and `ActionKind::QuarantineDuplicate` using the exact signatures in `plan.md`.
+- [x] T002 [Role: Worker (Haiku/Luna) | Write: `src/types.rs` | Deps: `T001`] Add unit tests in `src/types.rs` for `DuplicateGroup`, `DuplicateScanSummary`, `DuplicateScanMsg`, `QuarantineMode::default()`, and `ActionKind::QuarantineDuplicate` using the exact signatures in `plan.md`.
 
 ### Implementation for Phase 2
 
-- [ ] T003 [Role: Worker (Haiku/Luna) | Write: `src/types.rs`, `src/ui_logic.rs` | Deps: `T002`] Add `DuplicateGroup`, `DuplicateScanSummary`, `DuplicateScanMsg`, `QuarantineMode`, and `ActionKind::QuarantineDuplicate` in `src/types.rs`, plus the exhaustive match arm `ActionKind::QuarantineDuplicate => "Quarantine duplicate"` in `src/ui_logic.rs:1370-1380` (and matching `format_action_outcome` unit test). Verify: `cargo test --locked --lib types::tests` and `cargo test --locked --lib` pass.
+- [x] T003 [Role: Worker (Haiku/Luna) | Write: `src/types.rs`, `src/ui_logic.rs` | Deps: `T002`] Add `DuplicateGroup`, `DuplicateScanSummary`, `DuplicateScanMsg`, `QuarantineMode`, and `ActionKind::QuarantineDuplicate` in `src/types.rs`, plus the exhaustive match arm `ActionKind::QuarantineDuplicate => "Quarantine duplicate"` in `src/ui_logic.rs:1370-1380` (and matching `format_action_outcome` unit test). Verify: `cargo test --locked --lib types::tests` and `cargo test --locked --lib` pass.
 
 **Checkpoint**: `cargo test --locked --lib` compiles and passes cleanly.
 

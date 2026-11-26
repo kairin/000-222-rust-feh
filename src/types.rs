@@ -2,6 +2,7 @@
 //! Core domain types for rust-feh (clean, independent of GUI).
 
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use std::path::PathBuf;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -293,11 +294,12 @@ pub enum ContextAction {
     CopyImage,
 }
 
-/// What produced an `ActionOutcome`: a context-menu action, or a viewer round-trip (feature 016).
+/// What produced an `ActionOutcome`: a context-menu action, a viewer round-trip, or duplicate quarantine.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ActionKind {
     Context(ContextAction),
     RoundTrip,
+    QuarantineDuplicate,
 }
 
 /// Outcome of one action/round-trip (feature 016, FR-010).
@@ -337,9 +339,48 @@ impl Default for ActionPrefs {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DuplicateGroup {
+    pub byte_len: u64,
+    pub members: Vec<PathBuf>,
+    pub keep: HashSet<PathBuf>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct DuplicateScanSummary {
+    pub total_candidates: usize,
+    pub checked_files: usize,
+    pub groups: Vec<DuplicateGroup>,
+    pub warnings: Vec<String>,
+    pub cancelled: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DuplicateScanMsg {
+    Progress {
+        generation: u64,
+        checked_files: usize,
+        total_files: usize,
+    },
+    Complete {
+        generation: u64,
+        summary: DuplicateScanSummary,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub enum QuarantineMode {
+    #[default]
+    DefaultSubfolder,
+    CustomDir(PathBuf),
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashSet;
+
+    fn assert_eq_impl<T: Eq>(_: &T) {}
 
     #[test]
     fn action_prefs_default_has_no_destination() {
@@ -397,5 +438,92 @@ mod tests {
 
         assert_eq!(ok_outcome, ok_outcome_2);
         assert_ne!(ok_outcome, err_outcome);
+    }
+
+    #[test]
+    fn duplicate_group_constructs_and_derives_traits() {
+        let mut keep = HashSet::new();
+        keep.insert(PathBuf::from("/tmp/a.jpg"));
+        let group = DuplicateGroup {
+            byte_len: 1024,
+            members: vec![PathBuf::from("/tmp/a.jpg"), PathBuf::from("/tmp/b.jpg")],
+            keep,
+        };
+        let cloned = group.clone();
+        assert_eq!(group, cloned);
+        assert_eq_impl(&group);
+        assert!(!format!("{group:?}").is_empty());
+    }
+
+    #[test]
+    fn duplicate_scan_summary_constructs_and_defaults() {
+        let default_summary = DuplicateScanSummary::default();
+        assert_eq!(default_summary.total_candidates, 0);
+        assert_eq!(default_summary.checked_files, 0);
+        assert!(default_summary.groups.is_empty());
+        assert!(default_summary.warnings.is_empty());
+        assert!(!default_summary.cancelled);
+
+        let summary = DuplicateScanSummary {
+            total_candidates: 4,
+            checked_files: 4,
+            groups: Vec::new(),
+            warnings: vec!["skipped".to_string()],
+            cancelled: true,
+        };
+        let cloned = summary.clone();
+        assert_eq!(summary, cloned);
+        assert_ne!(summary, default_summary);
+        assert_eq_impl(&summary);
+        assert!(!format!("{summary:?}").is_empty());
+    }
+
+    #[test]
+    fn duplicate_scan_msg_variants_construct_and_match() {
+        let progress = DuplicateScanMsg::Progress {
+            generation: 7,
+            checked_files: 2,
+            total_files: 5,
+        };
+        assert!(matches!(
+            progress,
+            DuplicateScanMsg::Progress {
+                generation: 7,
+                checked_files: 2,
+                total_files: 5
+            }
+        ));
+
+        let complete = DuplicateScanMsg::Complete {
+            generation: 7,
+            summary: DuplicateScanSummary::default(),
+        };
+        assert!(matches!(
+            complete,
+            DuplicateScanMsg::Complete { generation: 7, .. }
+        ));
+    }
+
+    #[test]
+    fn quarantine_mode_default_and_custom_dir() {
+        let default_mode = QuarantineMode::default();
+        assert_eq!(default_mode, QuarantineMode::DefaultSubfolder);
+        let custom = QuarantineMode::CustomDir(PathBuf::from("/tmp/q"));
+        assert_ne!(custom, QuarantineMode::DefaultSubfolder);
+    }
+
+    #[test]
+    fn action_kind_quarantine_duplicate_is_distinct() {
+        let outcome = ActionOutcome {
+            action: ActionKind::QuarantineDuplicate,
+            image: PathBuf::from("/tmp/dup.jpg"),
+            destination: Some(PathBuf::from("/tmp/duplicates/dup.jpg")),
+            result: ActionResult::Ok {
+                produced: Some(PathBuf::from("/tmp/duplicates/dup.jpg")),
+            },
+        };
+        assert_eq!(outcome.action, ActionKind::QuarantineDuplicate);
+        assert_ne!(outcome.action, ActionKind::RoundTrip);
+        assert_ne!(outcome.action, ActionKind::Context(ContextAction::MoveTo));
     }
 }
