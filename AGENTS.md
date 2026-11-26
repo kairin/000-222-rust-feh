@@ -3,12 +3,12 @@
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at specs/019-browser-first-ux/plan.md
+at specs/020-duplicate-detection/plan.md
 <!-- SPECKIT END -->
 
 ## Current status
 
-No feature is active. The last shipped feature is 019; its [plan](specs/019-browser-first-ux/plan.md) and [scope](specs/019-browser-first-ux/spec.md) are the UX reference. The current UX architecture authority remains [docs/UI-UX-REDESIGN.md](docs/UI-UX-REDESIGN.md).
+Active authorized feature: `020-duplicate-detection` ([spec](specs/020-duplicate-detection/spec.md), [plan](specs/020-duplicate-detection/plan.md), [tasks](specs/020-duplicate-detection/tasks.md)). The shipped browser-first UX baseline is 019 ([plan](specs/019-browser-first-ux/plan.md), [scope](specs/019-browser-first-ux/spec.md)). The UX architecture authority remains [docs/UI-UX-REDESIGN.md](docs/UI-UX-REDESIGN.md).
 For shipped outcomes and retained historical evidence, read [docs/PROJECT-HISTORY.md](docs/PROJECT-HISTORY.md).
 Feature-specific Spec Kit templates and workflows remain available when creating an
 authorized feature; historical feature plans are not current product requirements.
