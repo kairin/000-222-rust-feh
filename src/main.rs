@@ -14,7 +14,7 @@ use rust_feh::types::{
     WindowSizePreset,
 };
 use rust_feh::ui_logic::{
-    active_duplicate_path_set, add_or_update_asset_in_inventory,
+    action_prefs_path, active_duplicate_path_set, add_or_update_asset_in_inventory,
     apply_converted_detection_cancellable, apply_rename_pairs, build_entry_filelist,
     clamp_window_size, cleanup_stale_handoffs, collision_suffixed_path, compute_output_path,
     copy_image_to_clipboard, crop_preview_pixels, default_tree_expanded,
@@ -27,7 +27,7 @@ use rust_feh::ui_logic::{
     list_indices_with_duplicates, list_subfolders, list_view_mode_label, load_action_prefs,
     load_launch_list, load_window_prefs, merge_converted_statuses, plan_loss_proof_move,
     post_scan_status, prepare_fast_work_dir, prune_duplicate_groups_after_moves,
-    quarantine_group_extras, relative_folder, resolve_quarantine_dir, save_action_prefs,
+    quarantine_group_extras, relative_folder, resolve_quarantine_dir, save_action_prefs_to,
     save_copy_to, save_launch_list, save_window_prefs, scan_magick_enabled, showing_count_label,
     sort_mode_label, spawn_job, toggle_group_keep, tree_visible_rows_with_duplicates,
     validate_handoff, viewer_profile_dir, viewer_spawn_command,
@@ -130,6 +130,8 @@ impl RustFehApp {
             stage_texture: None,
             compact_preview_open: false,
             action_prefs,
+            action_prefs_file: action_prefs_path(),
+            pending_dialog: None,
             round_trips: Vec::new(),
             next_viewer_id: 0,
             pending_scroll_path: None,
@@ -486,6 +488,8 @@ struct RustFehApp {
     stage_texture: Option<egui::TextureHandle>,
     compact_preview_open: bool,
     action_prefs: ActionPrefs,
+    action_prefs_file: PathBuf,
+    pending_dialog: Option<PendingFileDialog>,
     /// Live round-trip viewers, polled every frame (feature 016, US2).
     round_trips: Vec<ViewerRoundTrip>,
     next_viewer_id: u64,
@@ -502,6 +506,21 @@ struct RustFehApp {
     tree_rows_cache: Vec<TreeRow>,
     tree_rows_cache_key: Option<TreeRowsKey>,
     duplicates: DuplicateUiState,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum DialogTarget {
+    BrowseFolder,
+    QuarantineFolder,
+    SaveCopyTo { source: PathBuf },
+    MoveTo { source: PathBuf },
+    CacheRoot,
+    CachePasskey,
+}
+
+struct PendingFileDialog {
+    target: DialogTarget,
+    rx: Receiver<Option<PathBuf>>,
 }
 
 enum DuplicateCardAction {
@@ -684,10 +703,93 @@ impl RustFehApp {
     /// (before this runs) leaves `present == prior` and never opens Browse
     /// (maintainer clarification: "folder already set at launch → Browse stays
     /// folded").
-    fn pick_folder(&mut self) {
-        if let Some(dir) = rfd::FileDialog::new().pick_folder() {
-            self.log(format!("User chose folder: {}", dir.display()));
-            self.navigate_to_folder(&dir);
+    fn pick_folder(&mut self, ctx: &egui::Context) {
+        let initial_dir = self.current_dir.clone();
+        self.open_file_dialog(ctx, DialogTarget::BrowseFolder, initial_dir, false);
+    }
+
+    fn pick_quarantine_folder(&mut self, ctx: &egui::Context) {
+        let initial_dir = self
+            .action_prefs
+            .last_destination
+            .clone()
+            .or_else(|| self.current_dir.clone());
+        self.open_file_dialog(ctx, DialogTarget::QuarantineFolder, initial_dir, false);
+    }
+
+    fn can_open_file_dialog(&self) -> bool {
+        self.pending_dialog.is_none()
+    }
+
+    fn open_file_dialog(
+        &mut self,
+        ctx: &egui::Context,
+        target: DialogTarget,
+        initial_dir: Option<PathBuf>,
+        pick_file: bool,
+    ) {
+        if !self.can_open_file_dialog() {
+            self.status = "Finish or cancel the open file dialog first".to_string();
+            return;
+        }
+        let (tx, rx) = mpsc::channel();
+        self.pending_dialog = Some(PendingFileDialog { target, rx });
+        let ctx = ctx.clone();
+        thread::spawn(move || {
+            let mut dialog = rfd::FileDialog::new();
+            if let Some(dir) = initial_dir.filter(|d| d.is_dir()) {
+                dialog = dialog.set_directory(&dir);
+            }
+            let choice = if pick_file {
+                dialog.pick_file()
+            } else {
+                dialog.pick_folder()
+            };
+            let _ = tx.send(choice);
+            ctx.request_repaint();
+        });
+    }
+
+    fn poll_file_dialog(&mut self) {
+        let Some(pending) = self.pending_dialog.take() else {
+            return;
+        };
+        match pending.rx.try_recv() {
+            Ok(choice) => self.apply_dialog_choice(pending.target, choice),
+            Err(mpsc::TryRecvError::Empty) => {
+                self.pending_dialog = Some(pending);
+            }
+            Err(mpsc::TryRecvError::Disconnected) => {}
+        }
+    }
+
+    fn apply_dialog_choice(&mut self, target: DialogTarget, choice: Option<PathBuf>) {
+        let Some(chosen) = choice else {
+            return;
+        };
+        match target {
+            DialogTarget::BrowseFolder => {
+                self.log(format!("User chose folder: {}", chosen.display()));
+                self.navigate_to_folder(&chosen);
+            }
+            DialogTarget::QuarantineFolder => {
+                self.persist_action_destination(&chosen);
+                self.duplicates.quarantine_mode = QuarantineMode::CustomDir(chosen);
+            }
+            DialogTarget::SaveCopyTo { source } => {
+                self.persist_action_destination(&chosen);
+                self.finish_save_copy(&source, chosen);
+            }
+            DialogTarget::MoveTo { source } => {
+                self.persist_action_destination(&chosen);
+                self.finish_move_to(&source, chosen);
+            }
+            DialogTarget::CacheRoot => {
+                self.cache_config.root = Some(chosen);
+            }
+            DialogTarget::CachePasskey => {
+                self.cache_config.passkey_path = Some(chosen);
+            }
         }
     }
 
@@ -1123,10 +1225,12 @@ impl RustFehApp {
             {
                 self.duplicates.quarantine_mode = QuarantineMode::DefaultSubfolder;
             }
-            if ui.button("Choose folder…").clicked() {
-                if let Some(dir) = self.pick_action_destination() {
-                    self.duplicates.quarantine_mode = QuarantineMode::CustomDir(dir);
-                }
+            let choose_btn = ui.add_enabled(
+                self.can_open_file_dialog(),
+                egui::Button::new("Choose folder…"),
+            );
+            if choose_btn.clicked() {
+                self.pick_quarantine_folder(ui.ctx());
             }
             if let Some(cur) = self.current_dir.as_deref() {
                 let target = resolve_quarantine_dir(cur, &self.duplicates.quarantine_mode);
@@ -2609,6 +2713,7 @@ impl RustFehApp {
     }
 
     fn render_tools_cache_path_pickers(&mut self, ui: &mut egui::Ui) {
+        let can_pick = self.can_open_file_dialog();
         ui.horizontal(|ui| {
             ui.label("Root:");
             let root_label = self
@@ -2618,10 +2723,12 @@ impl RustFehApp {
                 .map(|p| p.display().to_string())
                 .unwrap_or_else(|| "(default)".into());
             ui.label(egui::RichText::new(root_label).small());
-            if ui.button("Pick root…").clicked() {
-                if let Some(dir) = rfd::FileDialog::new().pick_folder() {
-                    self.cache_config.root = Some(dir);
-                }
+            if ui
+                .add_enabled(can_pick, egui::Button::new("Pick root…"))
+                .clicked()
+            {
+                let initial = self.cache_config.root.clone();
+                self.open_file_dialog(ui.ctx(), DialogTarget::CacheRoot, initial, false);
             }
         });
         ui.horizontal(|ui| {
@@ -2633,10 +2740,16 @@ impl RustFehApp {
                 .map(|p| p.display().to_string())
                 .unwrap_or_else(|| "(none)".into());
             ui.label(egui::RichText::new(pk_label).small());
-            if ui.button("Pick passkey…").clicked() {
-                if let Some(file) = rfd::FileDialog::new().pick_file() {
-                    self.cache_config.passkey_path = Some(file);
-                }
+            if ui
+                .add_enabled(can_pick, egui::Button::new("Pick passkey…"))
+                .clicked()
+            {
+                let initial = self
+                    .cache_config
+                    .passkey_path
+                    .as_ref()
+                    .and_then(|p| p.parent().map(Path::to_path_buf));
+                self.open_file_dialog(ui.ctx(), DialogTarget::CachePasskey, initial, true);
             }
         });
     }
@@ -2881,8 +2994,11 @@ impl RustFehApp {
     fn render_browser_toolbar(&mut self, ui: &mut egui::Ui, narrow: bool) {
         let has_folder = self.current_dir.is_some();
         ui.horizontal_wrapped(|ui| {
-            if ui.button("Open folder").clicked() {
-                self.pick_folder();
+            if ui
+                .add_enabled(self.can_open_file_dialog(), egui::Button::new("Open folder"))
+                .clicked()
+            {
+                self.pick_folder(ui.ctx());
             }
             ui.label("Filter:");
             ui.add_enabled_ui(has_folder, |ui| {
@@ -3928,12 +4044,19 @@ impl RustFehApp {
 
     fn render_context_actions(&mut self, ui: &mut egui::Ui, path: &Path, process_hint: Option<&str>) {
         let decodable = process_hint.is_none();
-        if ui.button("Save a copy…").clicked() {
-            self.action_save_copy(path);
+        let can_pick = self.can_open_file_dialog();
+        if ui
+            .add_enabled(can_pick, egui::Button::new("Save a copy…"))
+            .clicked()
+        {
+            self.action_save_copy(ui.ctx(), path);
             ui.close_menu();
         }
-        if ui.button("Move to…").clicked() {
-            self.action_move_to(path);
+        if ui
+            .add_enabled(can_pick, egui::Button::new("Move to…"))
+            .clicked()
+        {
+            self.action_move_to(ui.ctx(), path);
             ui.close_menu();
         }
         if ui
@@ -3975,10 +4098,15 @@ impl RustFehApp {
 
     // --- Context actions (feature 016, FR-002..FR-006/FR-010) ---
 
-    fn action_save_copy(&mut self, path: &Path) {
-        let Some(dest_dir) = self.pick_action_destination() else {
-            return;
+    fn action_save_copy(&mut self, ctx: &egui::Context, path: &Path) {
+        let initial = self.action_prefs.last_destination.clone();
+        let target = DialogTarget::SaveCopyTo {
+            source: path.to_path_buf(),
         };
+        self.open_file_dialog(ctx, target, initial, false);
+    }
+
+    fn finish_save_copy(&mut self, path: &Path, dest_dir: PathBuf) {
         match save_copy_to(path, &dest_dir) {
             Ok(produced) => self.record_action_outcome(
                 ContextAction::SaveCopyTo,
@@ -3995,10 +4123,15 @@ impl RustFehApp {
         }
     }
 
-    fn action_move_to(&mut self, path: &Path) {
-        let Some(dest_dir) = self.pick_action_destination() else {
-            return;
+    fn action_move_to(&mut self, ctx: &egui::Context, path: &Path) {
+        let initial = self.action_prefs.last_destination.clone();
+        let target = DialogTarget::MoveTo {
+            source: path.to_path_buf(),
         };
+        self.open_file_dialog(ctx, target, initial, false);
+    }
+
+    fn finish_move_to(&mut self, path: &Path, dest_dir: PathBuf) {
         let plan = match plan_loss_proof_move(path, &dest_dir) {
             Ok(p) => p,
             Err(reason) => {
@@ -4027,19 +4160,11 @@ impl RustFehApp {
         }
     }
 
-    /// Native folder chooser starting at the persisted last destination
-    /// (FR-003); `None` on cancel (no side effects, per edge case).
-    fn pick_action_destination(&mut self) -> Option<PathBuf> {
-        let mut dialog = rfd::FileDialog::new();
-        if let Some(dir) = &self.action_prefs.last_destination {
-            dialog = dialog.set_directory(dir);
-        }
-        let dest_dir = dialog.pick_folder()?;
-        self.action_prefs.last_destination = Some(dest_dir.clone());
-        if let Err(e) = save_action_prefs(&self.action_prefs) {
+    fn persist_action_destination(&mut self, dest_dir: &Path) {
+        self.action_prefs.last_destination = Some(dest_dir.to_path_buf());
+        if let Err(e) = save_action_prefs_to(&self.action_prefs_file, &self.action_prefs) {
             self.log(format!("Failed to persist action prefs: {e}"));
         }
-        Some(dest_dir)
     }
 
     fn action_resize_copy(&mut self, path: &Path) {
@@ -4182,12 +4307,21 @@ impl RustFehApp {
         self.log(line.clone());
         self.status = line.clone();
         if is_err {
+            Self::spawn_error_dialog(line);
+        }
+    }
+
+    fn spawn_error_dialog(line: String) {
+        #[cfg(not(test))]
+        thread::spawn(move || {
             rfd::MessageDialog::new()
                 .set_title("Action failed")
                 .set_description(&line)
                 .set_level(rfd::MessageLevel::Error)
                 .show();
-        }
+        });
+        #[cfg(test)]
+        let _ = line;
     }
 
     fn record_action_outcome(
@@ -4211,6 +4345,10 @@ impl App for RustFehApp {
         self.poll_subfolders(ctx);
         self.poll_tools_job(ctx);
         self.poll_duplicate_job(ctx);
+        self.poll_file_dialog();
+        if self.pending_dialog.is_some() {
+            ctx.request_repaint_after(std::time::Duration::from_millis(250));
+        }
         Self::emit_startup_notice_once();
         self.sync_frame_input_state(ctx);
         self.poll_round_trip_viewers(ctx);
