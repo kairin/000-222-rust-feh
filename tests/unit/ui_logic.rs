@@ -1,19 +1,23 @@
 // SPDX-License-Identifier: MIT
+use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 use rust_feh::types::{
-    AssetStatus, FehLaunchEntry, FehLaunchList, ImageEntry, OutputPolicy, StageState,
-    WindowPreferences, WindowSizePreset,
+    AssetStatus, DuplicateGroup, FehLaunchEntry, FehLaunchList, ImageEntry, OutputPolicy,
+    SortMode, StageState, WindowPreferences, WindowSizePreset,
 };
 use rust_feh::ui_logic::{
-    add_or_update_asset_in_inventory, aggregate_batch_results, build_entry_filelist,
-    compute_output_path, copy_image_to_clipboard, crop_preview_pixels, decode_image_to_rgba,
-    entry_is_launchable, expand_rename_pattern, list_subfolders,
-    load_launch_list, load_window_prefs, save_launch_list, save_window_prefs,
-    process_actions_enabled_for_selection, stage_preview_status, write_feh_filelist_to,
-    PanelContext, PanelPin,
+    active_duplicate_path_set, add_or_update_asset_in_inventory, aggregate_batch_results,
+    build_entry_filelist, compute_output_path, copy_image_to_clipboard, crop_preview_pixels,
+    decode_image_to_rgba, default_keep_for_group, duplicate_group_spawn_command,
+    entry_is_launchable, expand_rename_pattern, feh_duplicate_group_filelist_path,
+    format_byte_size, list_indices,
+    list_indices_with_duplicates, list_subfolders, load_launch_list, load_window_prefs,
+    process_actions_enabled_for_selection, save_launch_list, save_window_prefs,
+    stage_preview_status, tree_visible_rows, tree_visible_rows_with_duplicates,
+    write_feh_filelist_to, InspectorSection, PanelContext, PanelPin, TreeRowKind,
 };
 
 static HOME_LOCK: Mutex<()> = Mutex::new(());
@@ -399,4 +403,163 @@ fn panel_context_unpinned_with_no_live_selection_is_empty() {
     assert_eq!(ctx.image, None);
     assert_eq!(ctx.folder, None);
     assert!(!ctx.pinned);
+}
+
+#[test]
+fn inspector_section_includes_duplicates() {
+    assert_eq!(InspectorSection::ALL.len(), 8);
+    assert!(InspectorSection::ALL.contains(&InspectorSection::Duplicates));
+}
+
+#[test]
+fn default_keep_for_group_prefers_shortest_then_lexicographic() {
+    let root = Path::new("/photos");
+    let nested = vec![
+        root.join("sub/a.jpg"),
+        root.join("a.jpg"),
+        root.join("sub/deep/a.jpg"),
+    ];
+    assert_eq!(
+        default_keep_for_group(&nested, Some(root)),
+        HashSet::from([root.join("a.jpg")])
+    );
+
+    let tie = vec![root.join("b.jpg"), root.join("a.jpg")];
+    assert_eq!(
+        default_keep_for_group(&tie, Some(root)),
+        HashSet::from([root.join("a.jpg")])
+    );
+}
+
+#[test]
+fn active_duplicate_path_set_collects_all_members() {
+    assert!(active_duplicate_path_set(&[]).is_empty());
+
+    let p1 = PathBuf::from("/photos/a.jpg");
+    let p2 = PathBuf::from("/photos/sub/a.jpg");
+    let p3 = PathBuf::from("/photos/b.png");
+    let groups = vec![
+        DuplicateGroup {
+            byte_len: 10,
+            members: vec![p1.clone(), p2.clone()],
+            keep: HashSet::from([p1.clone()]),
+        },
+        DuplicateGroup {
+            byte_len: 20,
+            members: vec![p3.clone(), p1.clone()],
+            keep: HashSet::from([p3.clone()]),
+        },
+    ];
+    assert_eq!(active_duplicate_path_set(&groups), HashSet::from([p1, p2, p3]));
+}
+
+#[test]
+fn list_indices_with_duplicates_filters_and_sorts() {
+    let root = Path::new("/photos");
+    let images = vec![
+        ImageEntry::new(root.join("z_dup.jpg")),
+        ImageEntry::new(root.join("unique.jpg")),
+        ImageEntry::new(root.join("sub/a_dup.jpg")),
+        ImageEntry::new(root.join("sub/b_other_dup.jpg")),
+    ];
+    let dup_set = HashSet::from([
+        root.join("z_dup.jpg"),
+        root.join("sub/a_dup.jpg"),
+        root.join("sub/b_other_dup.jpg"),
+    ]);
+
+    assert_eq!(
+        list_indices_with_duplicates(&images, Some(root), "", SortMode::Name, None),
+        list_indices(&images, Some(root), "", SortMode::Name)
+    );
+    assert_eq!(
+        list_indices_with_duplicates(&images, Some(root), "dup", SortMode::Name, Some(&dup_set)),
+        vec![2, 3, 0]
+    );
+    assert_eq!(
+        list_indices_with_duplicates(&images, Some(root), "sub", SortMode::Path, Some(&dup_set)),
+        vec![2, 3]
+    );
+}
+
+#[test]
+fn tree_visible_rows_with_duplicates_prunes_non_duplicate_folders() {
+    let root = Path::new("/photos");
+    let images = vec![
+        ImageEntry::new(root.join("top.jpg")),
+        ImageEntry::new(root.join("keep_only/x.jpg")),
+        ImageEntry::new(root.join("dup_dir/a.jpg")),
+    ];
+    let dup_set = HashSet::from([root.join("dup_dir/a.jpg")]);
+    let expanded = HashSet::from([".".to_string(), "dup_dir".to_string(), "keep_only".to_string()]);
+
+    assert_eq!(
+        tree_visible_rows_with_duplicates(&images, Some(root), "", SortMode::Path, &expanded, 0, None),
+        tree_visible_rows(&images, Some(root), "", SortMode::Path, &expanded, 0)
+    );
+
+    let rows = tree_visible_rows_with_duplicates(
+        &images,
+        Some(root),
+        "",
+        SortMode::Path,
+        &expanded,
+        0,
+        Some(&dup_set),
+    );
+    let folders: Vec<&str> = rows
+        .iter()
+        .filter(|r| r.kind == TreeRowKind::Folder)
+        .map(|r| r.folder_path.as_str())
+        .collect();
+    let files: Vec<Option<usize>> = rows
+        .iter()
+        .filter(|r| r.kind == TreeRowKind::File)
+        .map(|r| r.entry_index)
+        .collect();
+    assert_eq!(folders, vec![".", "dup_dir"]);
+    assert_eq!(files, vec![Some(2)]);
+}
+
+#[test]
+fn feh_duplicate_group_filelist_path_formats_pid() {
+    assert_eq!(
+        feh_duplicate_group_filelist_path(Path::new("/tmp/cache"), 4242),
+        PathBuf::from("/tmp/cache/filelist-dup-4242.txt")
+    );
+}
+
+#[test]
+fn duplicate_group_spawn_command_validates_and_writes_filelist() {
+    let dir = temp_test_dir("dup-spawn-cmd");
+    let filelist_path = dir.join("filelist-dup-99.txt");
+    assert!(duplicate_group_spawn_command(&filelist_path, &[]).is_err());
+
+    let p1 = dir.join("my photo '1'.jpg");
+    let p2 = dir.join("sub dir/copy '2'.jpg");
+    let members = vec![p1.clone(), p2.clone()];
+
+    let (program, args) = duplicate_group_spawn_command(&filelist_path, &members).unwrap();
+    assert_eq!(program, "feh");
+    let filelist_str = filelist_path.display().to_string();
+    let start_str = p1.display().to_string();
+    assert!(args.windows(2).any(|w| w == ["--filelist", &filelist_str]));
+    assert!(args.windows(2).any(|w| w == ["--start-at", &start_str]));
+    assert!(!args.iter().any(|a| a.contains("'\\''")));
+
+    let written: Vec<String> = fs::read_to_string(&filelist_path)
+        .unwrap()
+        .lines()
+        .map(str::to_string)
+        .collect();
+    assert_eq!(written, vec![p1.display().to_string(), p2.display().to_string()]);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn format_byte_size_formats_zero_b_kib_and_mib() {
+    assert_eq!(format_byte_size(0), "0 B");
+    assert_eq!(format_byte_size(512), "512 B");
+    assert_eq!(format_byte_size(2048), "2.0 KiB");
+    assert_eq!(format_byte_size(3 * 1024 * 1024), "3.0 MiB");
 }

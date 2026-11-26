@@ -4,34 +4,37 @@
 
 use eframe::{egui, App, Frame};
 use rust_feh::image_proc::{decode_stage_rgba, process_image, ImageToolsService, ProcessOptions};
-use rust_feh::scanner::{scan_images_streaming, ScanResult};
+use rust_feh::scanner::{find_exact_duplicates_streaming, scan_images_streaming, ScanResult};
 use rust_feh::tool_caps::{feh_spawn_unavailable, DepKind, FormatRoute, ToolCapabilities};
 use rust_feh::types::{
     ActionKind, ActionOutcome, ActionPrefs, ActionResult, AssetStatus, CacheConfig, ContextAction,
-    FehLaunchEntry, FehLaunchList, Filter, FitMode, ImageEntry, ImageOperation, ListViewMode,
-    OutputPolicy, PreparedFastSet, ProcessedResult, ScanInventory, SortMode, StageState,
-    WindowPreferences, WindowSizePreset,
+    DuplicateGroup, DuplicateScanMsg, DuplicateScanSummary, FehLaunchEntry, FehLaunchList,
+    Filter, FitMode, ImageEntry, ImageOperation, ListViewMode, OutputPolicy, PreparedFastSet,
+    ProcessedResult, QuarantineMode, ScanInventory, SortMode, StageState, WindowPreferences,
+    WindowSizePreset,
 };
 use rust_feh::ui_logic::{
-    add_or_update_asset_in_inventory, apply_converted_detection_cancellable, apply_rename_pairs,
-    build_entry_filelist, clamp_window_size, cleanup_stale_handoffs, collision_suffixed_path,
-    compute_output_path, copy_image_to_clipboard, crop_preview_pixels, default_tree_expanded,
-    entry_is_launchable, execute_move_plan, expand_rename_pattern, feh_entry_filelist_path,
-    feh_filelist_temp_path, feh_missing_status, feh_not_installed_launch_status, file_name_display,
-    file_status_label, finalize_scan_entries_fast, folder_line_suffix,
-    folder_tree_display_name, format_action_outcome, format_image_tools_log, format_inventory_bar,
-    handoff_path, inventory_magick_hint, is_network_mount_path,
-    join_activity_log, list_indices, list_subfolders, list_view_mode_label, load_action_prefs,
+    active_duplicate_path_set, add_or_update_asset_in_inventory,
+    apply_converted_detection_cancellable, apply_rename_pairs, build_entry_filelist,
+    clamp_window_size, cleanup_stale_handoffs, collision_suffixed_path, compute_output_path,
+    copy_image_to_clipboard, crop_preview_pixels, default_tree_expanded,
+    duplicate_group_spawn_command, entry_is_launchable, execute_move_plan, expand_rename_pattern,
+    feh_duplicate_temp_path, feh_entry_filelist_path, feh_filelist_temp_path, feh_missing_status,
+    feh_not_installed_launch_status, file_name_display, file_status_label,
+    finalize_scan_entries_fast, folder_line_suffix, folder_tree_display_name,
+    format_action_outcome, format_byte_size, format_image_tools_log, format_inventory_bar,
+    handoff_path, inventory_magick_hint, is_network_mount_path, join_activity_log,
+    list_indices_with_duplicates, list_subfolders, list_view_mode_label, load_action_prefs,
     load_launch_list, load_window_prefs, merge_converted_statuses, plan_loss_proof_move,
-    post_scan_status, prepare_fast_work_dir, relative_folder, save_action_prefs, save_copy_to,
-    save_launch_list, save_window_prefs, scan_magick_enabled, showing_count_label,
-    sort_mode_label, spawn_job,
-    tree_visible_rows, validate_handoff, viewer_profile_dir, viewer_spawn_command,
-    process_actions_enabled_for_selection, stage_preview_status, window_preset_dimensions,
-    window_preset_label, write_feh_filelist, write_feh_filelist_to,
-    DetachedWindow, EntryLaunchState, InspectorSection, JobMsg, PanelContext,
-    PanelPin, TreeRow, TreeRowKind, FEH_VIEWER_GEOMETRY, FEH_VIEWER_ZOOM, WINDOW_MAX_RESIZABLE,
-    WINDOW_MIN_RESIZABLE,
+    post_scan_status, prepare_fast_work_dir, prune_duplicate_groups_after_moves,
+    quarantine_group_extras, relative_folder, resolve_quarantine_dir, save_action_prefs,
+    save_copy_to, save_launch_list, save_window_prefs, scan_magick_enabled, showing_count_label,
+    sort_mode_label, spawn_job, toggle_group_keep, tree_visible_rows_with_duplicates,
+    validate_handoff, viewer_profile_dir, viewer_spawn_command,
+    process_actions_enabled_for_selection, stage_preview_status, window_preset_dimensions, window_preset_label, write_feh_filelist,
+    write_feh_filelist_to, DetachedWindow, EntryLaunchState, InspectorSection, JobMsg,
+    PanelContext, PanelPin, TreeRow, TreeRowKind, FEH_VIEWER_GEOMETRY, FEH_VIEWER_ZOOM,
+    WINDOW_MAX_RESIZABLE, WINDOW_MIN_RESIZABLE,
 };
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
@@ -134,6 +137,7 @@ impl RustFehApp {
             list_index_cache: std::cell::RefCell::new(None),
             tree_rows_cache: Vec::new(),
             tree_rows_cache_key: None,
+            duplicates: DuplicateUiState::default(),
         }
     }
 }
@@ -215,6 +219,26 @@ struct ActiveToolsJob {
     precache_ok: usize,
     prepare_paths: Vec<PathBuf>,
     prepare_temp: PathBuf,
+}
+
+struct ActiveDuplicateJob {
+    generation: u64,
+    target_revision: u64,
+    rx: Receiver<DuplicateScanMsg>,
+    cancel: Arc<AtomicBool>,
+    checked_files: usize,
+    total_files: usize,
+}
+
+#[derive(Default)]
+struct DuplicateUiState {
+    generation: u64,
+    job: Option<ActiveDuplicateJob>,
+    groups: Vec<DuplicateGroup>,
+    results_revision: Option<u64>,
+    duplicates_only: bool,
+    quarantine_mode: QuarantineMode,
+    last_checked: Option<usize>,
 }
 
 fn filter_label(f: Filter) -> &'static str {
@@ -372,6 +396,7 @@ struct ListIndexKey {
     current_dir: Option<PathBuf>,
     search: String,
     sort_mode: SortMode,
+    duplicates_only: bool,
 }
 
 /// `(total_count, filtered_indices)` — the result of `compute_list_indices`,
@@ -390,6 +415,7 @@ struct TreeRowsKey {
     sort_mode: SortMode,
     root_skipped: usize,
     expanded: std::collections::HashSet<String>,
+    duplicates_only: bool,
 }
 
 struct RustFehApp {
@@ -475,6 +501,14 @@ struct RustFehApp {
     /// Cross-frame cache for the folder-tree rows (reused when `TreeRowsKey` unchanged).
     tree_rows_cache: Vec<TreeRow>,
     tree_rows_cache_key: Option<TreeRowsKey>,
+    duplicates: DuplicateUiState,
+}
+
+enum DuplicateCardAction {
+    OpenFeh(Vec<PathBuf>),
+    Select(PathBuf),
+    ToggleKeep { group_idx: usize, path: PathBuf },
+    QuarantineGroup(usize),
 }
 
 enum FehEntryAction {
@@ -558,9 +592,13 @@ impl Drop for RustFehApp {
         if let Some(job) = self.tools_job.take() {
             job.cancel.store(true, Ordering::Relaxed);
         }
+        if let Some(job) = self.duplicates.job.take() {
+            job.cancel.store(true, Ordering::Relaxed);
+        }
         if let Some(dir) = self.prepare_fast_temp.take() {
             let _ = std::fs::remove_dir_all(&dir);
         }
+        let _ = std::fs::remove_file(feh_duplicate_temp_path());
     }
 }
 
@@ -575,6 +613,7 @@ impl RustFehApp {
     }
 
     fn compute_list_indices(&self) -> (usize, Vec<usize>) {
+        let dup_only = self.effective_duplicates_only();
         {
             let cache = self.list_index_cache.borrow();
             if let Some((key, value)) = cache.as_ref() {
@@ -582,6 +621,7 @@ impl RustFehApp {
                     && key.sort_mode == self.sort_mode
                     && key.search == self.search
                     && key.current_dir.as_deref() == self.current_dir.as_deref()
+                    && key.duplicates_only == dup_only
                 {
                     return value.clone();
                 }
@@ -589,11 +629,13 @@ impl RustFehApp {
         } // immutable borrow dropped before the mutable borrow below
 
         let total = self.images.len();
-        let indices = list_indices(
+        let dup_set = dup_only.then(|| active_duplicate_path_set(self.active_duplicate_groups()));
+        let indices = list_indices_with_duplicates(
             &self.images,
             self.current_dir.as_deref(),
             &self.search,
             self.sort_mode,
+            dup_set.as_ref(),
         );
         let value = (total, indices);
         let key = ListIndexKey {
@@ -601,6 +643,7 @@ impl RustFehApp {
             current_dir: self.current_dir.clone(),
             search: self.search.clone(),
             sort_mode: self.sort_mode,
+            duplicates_only: dup_only,
         };
         *self.list_index_cache.borrow_mut() = Some((key, value.clone()));
         value
@@ -877,7 +920,7 @@ impl RustFehApp {
     }
 
     fn is_activity_busy(&self) -> bool {
-        self.scanning
+        self.scanning || self.duplicates.job.is_some()
     }
 
     fn activity_pulse_color(time: f64, busy: bool) -> egui::Color32 {
@@ -1027,6 +1070,207 @@ impl RustFehApp {
                 self.toggle_format_route(&route_id);
             }
         }
+    }
+
+    fn render_duplicates_body(&mut self, ui: &mut egui::Ui) {
+        let can_scan = !self.scanning
+            && self.current_dir.is_some()
+            && !self.images.is_empty()
+            && self.duplicates.job.is_none();
+        ui.horizontal(|ui| {
+            let btn = ui.add_enabled(can_scan, egui::Button::new("Scan for duplicates"));
+            if btn.clicked() {
+                self.start_duplicate_scan();
+            }
+            if !can_scan {
+                if self.scanning {
+                    btn.on_disabled_hover_text("Wait for folder scan to finish");
+                } else if self.current_dir.is_none() || self.images.is_empty() {
+                    btn.on_disabled_hover_text("Load a folder with images first");
+                }
+            }
+            if let Some((checked, total)) = self
+                .duplicates
+                .job
+                .as_ref()
+                .map(|j| (j.checked_files, j.total_files))
+            {
+                ui.spinner();
+                ui.label(format!("Scanning {checked} / {total} files…"));
+                if ui.button("Cancel").clicked() {
+                    self.cancel_duplicate_scan();
+                }
+            }
+        });
+        self.render_quarantine_controls(ui);
+        if self.duplicates.results_revision == Some(self.images_revision) {
+            self.render_duplicate_results(ui);
+        } else if self.duplicates.job.is_none() {
+            ui.small("Click Scan for duplicates to find byte-identical files.");
+        }
+    }
+
+    fn render_quarantine_controls(&mut self, ui: &mut egui::Ui) {
+        let is_default = matches!(
+            self.duplicates.quarantine_mode,
+            QuarantineMode::DefaultSubfolder
+        );
+        ui.horizontal_wrapped(|ui| {
+            ui.label("Quarantine:");
+            if ui
+                .selectable_label(is_default, "Default (duplicates/)")
+                .clicked()
+            {
+                self.duplicates.quarantine_mode = QuarantineMode::DefaultSubfolder;
+            }
+            if ui.button("Choose folder…").clicked() {
+                if let Some(dir) = self.pick_action_destination() {
+                    self.duplicates.quarantine_mode = QuarantineMode::CustomDir(dir);
+                }
+            }
+            if let Some(cur) = self.current_dir.as_deref() {
+                let target = resolve_quarantine_dir(cur, &self.duplicates.quarantine_mode);
+                let full = target.display().to_string();
+                ui.weak(full.clone()).on_hover_text(full);
+            }
+        });
+        ui.weak("Moves non-Keep copies safely (never overwrites or deletes files).");
+    }
+
+    fn render_duplicate_results(&mut self, ui: &mut egui::Ui) {
+        let checked = self.duplicates.last_checked.unwrap_or(0);
+        let filter_active = self.duplicates.duplicates_only;
+        let stage_dims = match self.stage_state {
+            StageState::Ready { width, height } => Some((width, height)),
+            _ => None,
+        };
+        let groups = self.active_duplicate_groups();
+        if groups.is_empty() {
+            ui.label(format!("No exact duplicates found ({checked} files checked)."));
+            return;
+        }
+        ui.label(format!(
+            "{} exact duplicate group(s) found ({checked} files checked{}).",
+            groups.len(),
+            if filter_active { "; filter active" } else { "" }
+        ));
+        let mut action = None;
+        egui::ScrollArea::vertical()
+            .max_height(360.0)
+            .show(ui, |ui| {
+                for (idx, group) in groups.iter().enumerate() {
+                    if let Some(act) =
+                        self.render_duplicate_group_card(ui, idx, group, stage_dims)
+                    {
+                        action = Some(act);
+                    }
+                }
+            });
+        match action {
+            Some(DuplicateCardAction::OpenFeh(members)) => {
+                self.open_duplicate_group_in_feh(&members);
+            }
+            Some(DuplicateCardAction::Select(path)) => self.select_image(path),
+            Some(DuplicateCardAction::ToggleKeep { group_idx, path }) => {
+                if let Some(group) = self.duplicates.groups.get_mut(group_idx) {
+                    toggle_group_keep(group, &path);
+                }
+            }
+            Some(DuplicateCardAction::QuarantineGroup(group_idx)) => {
+                self.quarantine_duplicate_group(group_idx);
+            }
+            None => {}
+        }
+    }
+
+    fn render_duplicate_group_card(
+        &self,
+        ui: &mut egui::Ui,
+        idx: usize,
+        group: &DuplicateGroup,
+        stage_dims: Option<(u32, u32)>,
+    ) -> Option<DuplicateCardAction> {
+        let mut action = None;
+        let size_label = format_byte_size(group.byte_len);
+        let move_count = group.members.len().saturating_sub(group.keep.len());
+        ui.group(|ui| {
+            ui.horizontal_wrapped(|ui| {
+                ui.strong(format!(
+                    "Group #{} — {} files ({size_label} each)",
+                    idx + 1,
+                    group.members.len()
+                ));
+                let open_btn =
+                    ui.add_enabled(self.feh_available, egui::Button::new("Open group in feh"));
+                if open_btn.clicked() {
+                    action = Some(DuplicateCardAction::OpenFeh(group.members.clone()));
+                } else if !self.feh_available {
+                    open_btn.on_disabled_hover_text(feh_missing_status());
+                }
+                let move_btn = ui.add_enabled(
+                    move_count > 0,
+                    egui::Button::new(format!("Move {move_count} to quarantine")),
+                );
+                if move_btn.clicked() {
+                    action = Some(DuplicateCardAction::QuarantineGroup(idx));
+                } else if move_count == 0 {
+                    move_btn.on_disabled_hover_text("Uncheck Keep on extra copies to move them");
+                }
+            });
+            for member in &group.members {
+                if let Some(act) =
+                    self.render_duplicate_member_row(ui, idx, group, member, stage_dims)
+                {
+                    action = Some(act);
+                }
+            }
+        });
+        action
+    }
+
+    fn render_duplicate_member_row(
+        &self,
+        ui: &mut egui::Ui,
+        idx: usize,
+        group: &DuplicateGroup,
+        member: &Path,
+        stage_dims: Option<(u32, u32)>,
+    ) -> Option<DuplicateCardAction> {
+        let mut action = None;
+        let size_label = format_byte_size(group.byte_len);
+        ui.horizontal(|ui| {
+            let mut keep_checked = group.keep.contains(member);
+            let sole_keep = keep_checked && group.keep.len() == 1;
+            let cb = ui.add_enabled(!sole_keep, egui::Checkbox::new(&mut keep_checked, "Keep"));
+            if cb.changed() {
+                action = Some(DuplicateCardAction::ToggleKeep {
+                    group_idx: idx,
+                    path: member.to_path_buf(),
+                });
+            } else if sole_keep {
+                cb.on_disabled_hover_text("At least one file in each group must remain marked Keep");
+            }
+            let rel = self
+                .current_dir
+                .as_deref()
+                .and_then(|r| member.strip_prefix(r).ok())
+                .unwrap_or(member)
+                .display()
+                .to_string();
+            let is_selected = self.selected.as_deref() == Some(member);
+            let dims = is_selected
+                .then_some(stage_dims)
+                .flatten()
+                .map(|(w, h)| format!(" · {w}×{h}"))
+                .unwrap_or_default();
+            let resp = ui
+                .selectable_label(is_selected, format!("{rel} ({size_label}{dims})"))
+                .on_hover_text(member.display().to_string());
+            if resp.clicked() {
+                action = Some(DuplicateCardAction::Select(member.to_path_buf()));
+            }
+        });
+        action
     }
 
     fn render_image_actions_body(&mut self, ui: &mut egui::Ui, pctx: &PanelContext) {
@@ -1920,6 +2164,214 @@ impl RustFehApp {
         }
     }
 
+    fn active_duplicate_groups(&self) -> &[DuplicateGroup] {
+        if self.duplicates.results_revision == Some(self.images_revision) {
+            &self.duplicates.groups
+        } else {
+            &[]
+        }
+    }
+
+    fn effective_duplicates_only(&self) -> bool {
+        self.duplicates.duplicates_only && !self.active_duplicate_groups().is_empty()
+    }
+
+    fn open_duplicate_group_in_feh(&mut self, members: &[PathBuf]) {
+        if !self.feh_available {
+            self.status = feh_missing_status();
+            return;
+        }
+        let filelist_path = feh_duplicate_temp_path();
+        let (program, args) = match duplicate_group_spawn_command(&filelist_path, members) {
+            Ok(cmd) => cmd,
+            Err(err) => {
+                self.status = err.clone();
+                self.log(err);
+                return;
+            }
+        };
+        match Command::new(&program).args(&args).spawn() {
+            Ok(_child) => {
+                let count = members.len();
+                self.status = format!("Opened {count} duplicate(s) in feh");
+                self.log(format!("Launched feh for duplicate group ({count} files)"));
+            }
+            Err(e) => {
+                if feh_spawn_unavailable(&e) {
+                    self.mark_feh_unavailable();
+                } else {
+                    self.status = format!("Failed to launch feh: {e}");
+                    self.log(format!("Failed to launch feh for duplicate group: {e}"));
+                }
+            }
+        }
+    }
+
+    fn quarantine_duplicate_group(&mut self, group_idx: usize) {
+        let Some(cur) = self.current_dir.clone() else {
+            return;
+        };
+        let dest_dir = resolve_quarantine_dir(&cur, &self.duplicates.quarantine_mode);
+        let Some(group) = self.duplicates.groups.get(group_idx).cloned() else {
+            return;
+        };
+        let outcomes = quarantine_group_extras(&group, &dest_dir);
+        let mut moved_sources = HashSet::new();
+        for (src, res) in outcomes {
+            let outcome = match res {
+                Ok(produced) => {
+                    moved_sources.insert(src.clone());
+                    self.advance_stage_after_move(&src);
+                    Ok(Some(produced))
+                }
+                Err(reason) => Err(reason),
+            };
+            self.record_action_kind_outcome(
+                ActionKind::QuarantineDuplicate,
+                &src,
+                Some(dest_dir.clone()),
+                outcome,
+            );
+        }
+        if !moved_sources.is_empty() {
+            prune_duplicate_groups_after_moves(
+                &mut self.duplicates.groups,
+                &moved_sources,
+                self.current_dir.as_deref(),
+            );
+            self.duplicates.results_revision = Some(self.images_revision);
+            if self.duplicates.groups.is_empty() {
+                self.duplicates.duplicates_only = false;
+            }
+            *self.list_index_cache.get_mut() = None;
+            self.tree_rows_cache_key = None;
+            self.status = format!(
+                "Moved {} duplicate(s) to {} ({} group(s) remaining)",
+                moved_sources.len(),
+                dest_dir.display(),
+                self.duplicates.groups.len()
+            );
+        }
+    }
+
+    fn start_duplicate_scan(&mut self) {
+        if self.scanning || self.current_dir.is_none() || self.images.is_empty() {
+            return;
+        }
+        if let Some(prev) = self.duplicates.job.take() {
+            prev.cancel.store(true, Ordering::Relaxed);
+        }
+        self.duplicates.generation = self.duplicates.generation.wrapping_add(1);
+        let generation = self.duplicates.generation;
+        let target_revision = self.images_revision;
+        let candidates: Vec<PathBuf> = self.images.iter().map(|e| e.path.clone()).collect();
+        let total_files = candidates.len();
+        let current_dir = self.current_dir.clone();
+        let cancel = Arc::new(AtomicBool::new(false));
+        let cancel_worker = cancel.clone();
+        let (tx, rx) = mpsc::channel();
+        self.duplicates.job = Some(ActiveDuplicateJob {
+            generation,
+            target_revision,
+            rx,
+            cancel,
+            checked_files: 0,
+            total_files,
+        });
+        self.status = "Scanning for exact duplicates…".to_string();
+        thread::spawn(move || {
+            let _ = find_exact_duplicates_streaming(
+                &candidates,
+                current_dir.as_deref(),
+                generation,
+                &cancel_worker,
+                &tx,
+            );
+        });
+    }
+
+    fn cancel_duplicate_scan(&mut self) {
+        if let Some(job) = self.duplicates.job.take() {
+            job.cancel.store(true, Ordering::Relaxed);
+            self.status = "Duplicate scan cancelled".to_string();
+        }
+    }
+
+    fn cancel_and_clear_duplicates(&mut self) {
+        if let Some(job) = self.duplicates.job.take() {
+            job.cancel.store(true, Ordering::Relaxed);
+        }
+        self.duplicates.groups.clear();
+        self.duplicates.results_revision = None;
+        self.duplicates.last_checked = None;
+        self.duplicates.duplicates_only = false;
+        *self.list_index_cache.get_mut() = None;
+        self.tree_rows_cache_key = None;
+    }
+
+    fn apply_duplicate_complete(&mut self, target_revision: u64, summary: DuplicateScanSummary) {
+        self.duplicates.job = None;
+        if summary.cancelled || target_revision != self.images_revision {
+            return;
+        }
+        for w in summary.warnings {
+            self.log(w);
+        }
+        let group_count = summary.groups.len();
+        self.duplicates.groups = summary.groups;
+        self.duplicates.results_revision = Some(self.images_revision);
+        self.duplicates.last_checked = Some(summary.checked_files);
+        *self.list_index_cache.get_mut() = None;
+        self.tree_rows_cache_key = None;
+        if group_count == 0 {
+            self.duplicates.duplicates_only = false;
+            self.status = format!(
+                "No exact duplicates found ({} files checked)",
+                summary.checked_files
+            );
+        } else {
+            self.status = format!(
+                "Found {group_count} exact duplicate group(s) ({} files checked)",
+                summary.checked_files
+            );
+        }
+    }
+
+    fn poll_duplicate_job(&mut self, ctx: &egui::Context) {
+        let Some(mut job) = self.duplicates.job.take() else {
+            return;
+        };
+        loop {
+            match job.rx.try_recv() {
+                Ok(DuplicateScanMsg::Progress {
+                    generation,
+                    checked_files,
+                    total_files,
+                }) if generation == job.generation => {
+                    job.checked_files = checked_files;
+                    job.total_files = total_files;
+                }
+                Ok(DuplicateScanMsg::Progress { .. }) => {}
+                Ok(DuplicateScanMsg::Complete {
+                    generation,
+                    summary,
+                }) if generation == job.generation => {
+                    self.apply_duplicate_complete(job.target_revision, summary);
+                    return;
+                }
+                Ok(DuplicateScanMsg::Complete { .. }) => {}
+                Err(mpsc::TryRecvError::Empty) => {
+                    self.duplicates.job = Some(job);
+                    break;
+                }
+                Err(mpsc::TryRecvError::Disconnected) => return,
+            }
+        }
+        if self.duplicates.job.is_some() {
+            ctx.request_repaint_after(std::time::Duration::from_millis(100));
+        }
+    }
+
     fn tools_request_batch(&mut self) {
         let policy = self.tools_output_policy();
         if matches!(policy, OutputPolicy::InPlaceWithBackup { .. }) {
@@ -2451,6 +2903,19 @@ impl RustFehApp {
                     });
             });
             self.render_selection_action_controls(ui);
+            let dup_groups = self.active_duplicate_groups().len();
+            if dup_groups > 0
+                && ui
+                    .checkbox(
+                        &mut self.duplicates.duplicates_only,
+                        format!("Duplicates only ({dup_groups})"),
+                    )
+                    .changed()
+            {
+                *self.list_index_cache.get_mut() = None;
+                self.tree_rows_cache_key = None;
+                self.scroll_generation = self.scroll_generation.wrapping_add(1);
+            }
             if narrow && has_folder && ui.button("Preview").clicked() {
                 self.compact_preview_open = true;
             }
@@ -2553,6 +3018,7 @@ impl RustFehApp {
                 ui.weak("No files match this filter.");
                 if ui.button("Clear filter").clicked() {
                     self.search.clear();
+                    self.duplicates.duplicates_only = false;
                 }
             }
         } else {
@@ -2676,18 +3142,20 @@ impl RustFehApp {
             InspectorSection::ActivityLog => ("Activity log", 520.0),
             InspectorSection::Dependencies => ("Installed tools", 420.0),
             InspectorSection::FormatDiscovery => ("Format support", 480.0),
+            InspectorSection::Duplicates => ("Duplicates", 480.0),
         }
     }
 
-    /// Detached (floating) inspector windows: one per `InspectorSection`
-    /// present in `self.detached`. Iterates `InspectorSection::ALL` (NEVER
-    /// the `HashMap`, whose iteration order is unspecified) so window
-    /// spawn/z-order is deterministic frame to frame. Body dispatch is a
-    /// `match` (not fn pointers — a `[fn(&mut Self, ...); 7]` table can't
-    /// paper over the differing per-section arg lists — e.g. session status
-    /// needs `shown`/`total`/`time` — without a wrapper closure per entry
-    /// anyway, so a direct `match` is both simpler and avoids `&mut self`
-    /// fn-pointer variance pain).
+    /// This method renders one detached window for each `InspectorSection` in
+    /// `self.detached`. It iterates `InspectorSection::ALL` instead of the
+    /// `HashMap` because the `HashMap` has no fixed order. This keeps spawn
+    /// order and z-order deterministic on each frame.
+    ///
+    /// Body dispatch uses a `match` on `InspectorSection` instead of a
+    /// `[fn(&mut Self, ...); 8]` table. Sections take different arguments, such
+    /// as `shown`, `total`, and `time` for session status. A table needs a
+    /// wrapper closure for each of the 8 sections. A direct `match` is simpler
+    /// and avoids `&mut Self` lifetime variance and borrow-checker errors.
     fn render_detached_inspector_windows(&mut self, ctx: &egui::Context) {
         let time = ctx.input(|i| i.time);
         let (total, filtered) = self.compute_list_indices();
@@ -2757,6 +3225,7 @@ impl RustFehApp {
                     InspectorSection::ActivityLog => self.render_activity_log_body(ui, ctx),
                     InspectorSection::Dependencies => self.render_deps_section_body(ui, ctx),
                     InspectorSection::FormatDiscovery => self.render_format_discovery_body(ui),
+                    InspectorSection::Duplicates => self.render_duplicates_body(ui),
                 });
             if !open {
                 self.detached.remove(&section);
@@ -2848,6 +3317,7 @@ impl RustFehApp {
                 ("Scan settings…", InspectorSection::Browse),
                 ("Image Tools and pinning…", InspectorSection::ImageActions),
                 ("Saved feh launches…", InspectorSection::FehInstances),
+                ("Duplicates…", InspectorSection::Duplicates),
                 ("Session status and inventory…", InspectorSection::SessionStatus),
                 ("Activity log…", InspectorSection::ActivityLog),
                 ("Format support…", InspectorSection::FormatDiscovery),
@@ -3210,6 +3680,41 @@ impl RustFehApp {
         });
     }
 
+    fn ensure_tree_rows_cache(&mut self, list_root: Option<&Path>, root_skipped: usize) {
+        let dup_only = self.effective_duplicates_only();
+        let hit = self.tree_rows_cache_key.as_ref().is_some_and(|k| {
+            k.revision == self.images_revision
+                && k.sort_mode == self.sort_mode
+                && k.root_skipped == root_skipped
+                && k.search == self.search
+                && k.current_dir.as_deref() == self.current_dir.as_deref()
+                && k.expanded == self.tree_expanded_paths
+                && k.duplicates_only == dup_only
+        });
+        if hit {
+            return;
+        }
+        let dup_set = dup_only.then(|| active_duplicate_path_set(self.active_duplicate_groups()));
+        self.tree_rows_cache = tree_visible_rows_with_duplicates(
+            &self.images,
+            list_root,
+            &self.search,
+            self.sort_mode,
+            &self.tree_expanded_paths,
+            root_skipped,
+            dup_set.as_ref(),
+        );
+        self.tree_rows_cache_key = Some(TreeRowsKey {
+            revision: self.images_revision,
+            current_dir: self.current_dir.clone(),
+            search: self.search.clone(),
+            sort_mode: self.sort_mode,
+            root_skipped,
+            expanded: self.tree_expanded_paths.clone(),
+            duplicates_only: dup_only,
+        });
+    }
+
     fn render_tree_image_list(
         &mut self,
         ui: &mut egui::Ui,
@@ -3222,33 +3727,7 @@ impl RustFehApp {
             .as_ref()
             .map(|i| i.non_image_skipped)
             .unwrap_or(0);
-
-        let hit = self.tree_rows_cache_key.as_ref().is_some_and(|k| {
-            k.revision == self.images_revision
-                && k.sort_mode == self.sort_mode
-                && k.root_skipped == root_skipped
-                && k.search == self.search
-                && k.current_dir.as_deref() == self.current_dir.as_deref()
-                && k.expanded == self.tree_expanded_paths
-        });
-        if !hit {
-            self.tree_rows_cache = tree_visible_rows(
-                &self.images,
-                list_root,
-                &self.search,
-                self.sort_mode,
-                &self.tree_expanded_paths,
-                root_skipped,
-            );
-            self.tree_rows_cache_key = Some(TreeRowsKey {
-                revision: self.images_revision,
-                current_dir: self.current_dir.clone(),
-                search: self.search.clone(),
-                sort_mode: self.sort_mode,
-                root_skipped,
-                expanded: self.tree_expanded_paths.clone(),
-            });
-        }
+        self.ensure_tree_rows_cache(list_root, root_skipped);
 
         // Tree mode does not implement scroll-to-path, so consume-or-clear any
         // pending landing scroll here (018 FIX-6): otherwise a scroll armed while
@@ -3682,16 +4161,16 @@ impl RustFehApp {
 
     /// Log + surface every action outcome (FR-010); failures also raise a
     /// native error dialog naming the image and cause (SC-007).
-    fn record_action_outcome(
+    fn record_action_kind_outcome(
         &mut self,
-        action: ContextAction,
+        action: ActionKind,
         image: &Path,
         destination: Option<PathBuf>,
         result: Result<Option<PathBuf>, String>,
     ) {
         let is_err = result.is_err();
         let outcome = ActionOutcome {
-            action: ActionKind::Context(action),
+            action,
             image: image.to_path_buf(),
             destination,
             result: match result {
@@ -3710,6 +4189,16 @@ impl RustFehApp {
                 .show();
         }
     }
+
+    fn record_action_outcome(
+        &mut self,
+        action: ContextAction,
+        image: &Path,
+        destination: Option<PathBuf>,
+        result: Result<Option<PathBuf>, String>,
+    ) {
+        self.record_action_kind_outcome(ActionKind::Context(action), image, destination, result);
+    }
 }
 
 impl App for RustFehApp {
@@ -3721,6 +4210,7 @@ impl App for RustFehApp {
         self.poll_scan_complete(ctx);
         self.poll_subfolders(ctx);
         self.poll_tools_job(ctx);
+        self.poll_duplicate_job(ctx);
         Self::emit_startup_notice_once();
         self.sync_frame_input_state(ctx);
         self.poll_round_trip_viewers(ctx);
@@ -3878,6 +4368,7 @@ impl RustFehApp {
 
     fn scan_directory(&mut self, dir: &Path) {
         self.cancel_tools_job();
+        self.cancel_and_clear_duplicates();
         self.cleanup_prepare_fast_temp();
         self.scanning = true;
         self.status = "Scanning…".to_string();
@@ -4233,6 +4724,7 @@ impl RustFehApp {
             self.status = format!("Round trip landed on {name}");
         } else {
             self.search.clear();
+            self.duplicates.duplicates_only = false;
             self.status =
                 format!("Round trip landed on {name} — cleared the active filter to show it");
         }

@@ -3,16 +3,17 @@
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at specs/019-browser-first-ux/plan.md
+at specs/020-duplicate-detection/plan.md
 <!-- SPECKIT END -->
 
 ## Current status
 
-No feature is active. The last shipped feature is 019; its [plan](specs/019-browser-first-ux/plan.md) and [scope](specs/019-browser-first-ux/spec.md) are the UX reference. The current UX architecture authority remains [docs/UI-UX-REDESIGN.md](docs/UI-UX-REDESIGN.md).
+Feature `020-duplicate-detection` adds exact duplicate scanning, a browser filter, a standalone `feh` group view, and safe quarantine. See [spec](specs/020-duplicate-detection/spec.md), [plan](specs/020-duplicate-detection/plan.md), [tasks](specs/020-duplicate-detection/tasks.md), and [validation](specs/020-duplicate-detection/validation-results.md). Feature 019 established the browser-first UX baseline ([plan](specs/019-browser-first-ux/plan.md), [scope](specs/019-browser-first-ux/spec.md)). The UX architecture authority remains [docs/UI-UX-REDESIGN.md](docs/UI-UX-REDESIGN.md).
 For shipped outcomes and retained historical evidence, read [docs/PROJECT-HISTORY.md](docs/PROJECT-HISTORY.md).
+
 Feature-specific Spec Kit templates and workflows remain available when creating an
-authorized feature; historical feature plans are not current product requirements.
-Branch naming, never-delete, commit/push and test rules are routed from [.agents/ROUTING.md](.agents/ROUTING.md).
+authorized feature. Historical feature plans are not current product requirements.
+Branch naming, never-delete, commit/push and test rules route from [.agents/ROUTING.md](.agents/ROUTING.md).
 
 ## Git identity
 

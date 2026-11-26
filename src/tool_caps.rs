@@ -169,15 +169,32 @@ impl ToolCapabilities {
         ]
     }
 
-    pub fn operation_timings(&self) -> Vec<OperationTiming> {
-        let view_handler = if self.feh_available {
+    fn exotic_view_timing(&self) -> OperationTiming {
+        let handler = if self.magick_available && self.feh_available {
+            Handler::ImageMagick
+        } else if self.feh_available {
             Handler::Feh
         } else {
             Handler::RustFeh
         };
-        let exotic_view = if self.magick_available && self.feh_available {
-            Handler::ImageMagick
-        } else if self.feh_available {
+        OperationTiming {
+            operation: "Exotic format view (svg/heic/raw…)",
+            handler,
+            speed: if self.magick_available {
+                SpeedTier::Slow
+            } else {
+                SpeedTier::Medium
+            },
+            note: if self.magick_available {
+                "Image Tools can process a decodable selection with ImageMagick"
+            } else {
+                "Limited without ImageMagick on PATH"
+            },
+        }
+    }
+
+    pub fn operation_timings(&self) -> Vec<OperationTiming> {
+        let view_handler = if self.feh_available {
             Handler::Feh
         } else {
             Handler::RustFeh
@@ -207,19 +224,12 @@ impl ToolCapabilities {
                 note: "Requires a decodable selected image; Image Tools can convert with ImageMagick",
             },
             OperationTiming {
-                operation: "Exotic format view (svg/heic/raw…)",
-                handler: exotic_view,
-                speed: if self.magick_available {
-                    SpeedTier::Slow
-                } else {
-                    SpeedTier::Medium
-                },
-                note: if self.magick_available {
-                    "Image Tools can process a decodable selection with ImageMagick"
-                } else {
-                    "Limited without ImageMagick on PATH"
-                },
+                operation: "Exact duplicate scan (on demand)",
+                handler: Handler::RustFeh,
+                speed: SpeedTier::Medium,
+                note: "Tools → Duplicates; size + chunked byte check (no listing overhead)",
             },
+            self.exotic_view_timing(),
         ]
     }
 
@@ -471,5 +481,23 @@ mod tests {
         assert!(!deps[0].installed);
         assert_eq!(deps[1].kind, DepKind::Optional);
         assert!(caps.has_missing_required());
+    }
+
+    #[test]
+    fn operation_timings_include_exact_duplicate_scan() {
+        let caps = ToolCapabilities {
+            feh_available: false,
+            magick_available: false,
+            magick_binary: None,
+            magick_cache_available: false,
+            magick_cache_ready: false,
+        };
+        let ops = caps.operation_timings();
+        let dup = ops
+            .iter()
+            .find(|o| o.operation.contains("Duplicate") || o.operation.contains("duplicate"))
+            .expect("exact duplicate scan timing row");
+        assert_eq!(dup.handler, Handler::RustFeh);
+        assert_eq!(dup.speed, SpeedTier::Medium);
     }
 }

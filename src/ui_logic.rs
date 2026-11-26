@@ -3,8 +3,9 @@
 
 use crate::types::{
     ActionKind, ActionOutcome, ActionPrefs, ActionResult, AssetStatus, ContextAction,
-    FehLaunchEntry, FehLaunchList, FileStatus, ImageEntry, ListViewMode, OutputPolicy,
-    ProcessedResult, ScanInventory, SortMode, StageState, WindowPreferences, WindowSizePreset,
+    DuplicateGroup, FehLaunchEntry, FehLaunchList, FileStatus, ImageEntry, ListViewMode,
+    OutputPolicy, ProcessedResult, QuarantineMode, ScanInventory, SortMode, StageState,
+    WindowPreferences, WindowSizePreset,
 };
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::io::Write;
@@ -71,6 +72,37 @@ pub fn feh_filelist_temp_path() -> PathBuf {
 /// Per-entry feh filelist path so Launch All can write distinct lists concurrently.
 pub fn feh_entry_filelist_path(entry_id: &str) -> PathBuf {
     runtime_cache_dir().join(format!("filelist-{}-{}.txt", std::process::id(), entry_id))
+}
+
+pub fn feh_duplicate_group_filelist_path(cache_dir: &Path, pid: u32) -> PathBuf {
+    cache_dir.join(format!("filelist-dup-{pid}.txt"))
+}
+
+pub fn feh_duplicate_temp_path() -> PathBuf {
+    feh_duplicate_group_filelist_path(&runtime_cache_dir(), std::process::id())
+}
+
+pub fn duplicate_group_spawn_command(
+    filelist_path: &Path,
+    members: &[PathBuf],
+) -> Result<(String, Vec<String>), String> {
+    let Some(start_at) = members.first() else {
+        return Err("Duplicate group has no members".to_string());
+    };
+    write_feh_filelist_to(filelist_path, members)
+        .map_err(|e| format!("Failed to write duplicate filelist: {e}"))?;
+    let args = vec![
+        "-g".to_string(),
+        FEH_VIEWER_GEOMETRY.to_string(),
+        "--scale-down".to_string(),
+        "--zoom".to_string(),
+        FEH_VIEWER_ZOOM.to_string(),
+        "--start-at".to_string(),
+        start_at.display().to_string(),
+        "--filelist".to_string(),
+        filelist_path.display().to_string(),
+    ];
+    Ok(("feh".to_string(), args))
 }
 
 /// POSIX single-quote escaping: wrap `s` in single quotes and replace every
@@ -645,7 +677,20 @@ pub fn list_indices(
     search: &str,
     sort: SortMode,
 ) -> Vec<usize> {
+    list_indices_with_duplicates(images, root, search, sort, None)
+}
+
+pub fn list_indices_with_duplicates(
+    images: &[ImageEntry],
+    root: Option<&Path>,
+    search: &str,
+    sort: SortMode,
+    duplicate_paths: Option<&HashSet<PathBuf>>,
+) -> Vec<usize> {
     let mut indices = filter_indices(images, root, search);
+    if let Some(dset) = duplicate_paths {
+        indices.retain(|&i| dset.contains(&images[i].path));
+    }
     indices.sort_by_cached_key(|&a| sort_key(images, a, sort, root));
     indices
 }
@@ -960,7 +1005,19 @@ pub fn tree_visible_rows(
     expanded: &HashSet<String>,
     root_skipped: usize,
 ) -> Vec<TreeRow> {
-    let indices = list_indices(images, root, search, sort);
+    tree_visible_rows_with_duplicates(images, root, search, sort, expanded, root_skipped, None)
+}
+
+pub fn tree_visible_rows_with_duplicates(
+    images: &[ImageEntry],
+    root: Option<&Path>,
+    search: &str,
+    sort: SortMode,
+    expanded: &HashSet<String>,
+    root_skipped: usize,
+    duplicate_paths: Option<&HashSet<PathBuf>>,
+) -> Vec<TreeRow> {
+    let indices = list_indices_with_duplicates(images, root, search, sort, duplicate_paths);
     let effective = effective_expanded_paths(images, root, search, &indices, expanded);
     let tree = build_folder_tree(images, root, &indices);
     let mut rows = Vec::new();
@@ -1376,6 +1433,7 @@ fn action_kind_label(kind: &ActionKind) -> &'static str {
         ActionKind::Context(ContextAction::CopyPath) => "Copy path",
         ActionKind::Context(ContextAction::CopyImage) => "Copy image",
         ActionKind::RoundTrip => "Round trip",
+        ActionKind::QuarantineDuplicate => "Quarantine duplicate",
     }
 }
 
@@ -1395,6 +1453,18 @@ pub fn format_action_outcome(outcome: &ActionOutcome) -> String {
         ActionResult::Err { reason } => {
             format!("{label} failed: {} — {reason}", outcome.image.display())
         }
+    }
+}
+
+pub fn format_byte_size(bytes: u64) -> String {
+    const KIB: u64 = 1024;
+    const MIB: u64 = 1024 * 1024;
+    if bytes >= MIB {
+        format!("{:.1} MiB", bytes as f64 / MIB as f64)
+    } else if bytes >= KIB {
+        format!("{:.1} KiB", bytes as f64 / KIB as f64)
+    } else {
+        format!("{bytes} B")
     }
 }
 
@@ -1638,11 +1708,12 @@ pub enum InspectorSection {
     ActivityLog,
     Dependencies,
     FormatDiscovery,
+    Duplicates,
 }
 
 impl InspectorSection {
     /// Deterministic dispatch order for visible tool windows.
-    pub const ALL: [InspectorSection; 7] = [
+    pub const ALL: [InspectorSection; 8] = [
         InspectorSection::Browse,
         InspectorSection::ImageActions,
         InspectorSection::FehInstances,
@@ -1650,7 +1721,96 @@ impl InspectorSection {
         InspectorSection::ActivityLog,
         InspectorSection::Dependencies,
         InspectorSection::FormatDiscovery,
+        InspectorSection::Duplicates,
     ];
+}
+
+pub fn default_keep_for_group(members: &[PathBuf], root: Option<&Path>) -> HashSet<PathBuf> {
+    crate::scanner::pick_default_keep(members, root)
+}
+
+pub fn active_duplicate_path_set(groups: &[DuplicateGroup]) -> HashSet<PathBuf> {
+    groups
+        .iter()
+        .flat_map(|g| g.members.iter().cloned())
+        .collect()
+}
+
+pub fn toggle_group_keep(group: &mut DuplicateGroup, candidate: &Path) -> bool {
+    if group.keep.contains(candidate) {
+        if group.keep.len() <= 1 {
+            return false;
+        }
+        group.keep.remove(candidate);
+        true
+    } else {
+        group.keep.insert(candidate.to_path_buf());
+        true
+    }
+}
+
+pub fn resolve_quarantine_dir(current_dir: &Path, mode: &QuarantineMode) -> PathBuf {
+    match mode {
+        QuarantineMode::DefaultSubfolder => current_dir.join("duplicates"),
+        QuarantineMode::CustomDir(dir) => dir.clone(),
+    }
+}
+
+pub fn quarantine_group_extras(
+    group: &DuplicateGroup,
+    dest_dir: &Path,
+) -> Vec<(PathBuf, Result<PathBuf, String>)> {
+    let extras: Vec<PathBuf> = group
+        .members
+        .iter()
+        .filter(|m| !group.keep.contains(*m))
+        .cloned()
+        .collect();
+    if extras.is_empty() {
+        return Vec::new();
+    }
+    if group.keep.is_empty() || !group.members.iter().any(|m| group.keep.contains(m)) {
+        let msg = "At least one file in the group must remain marked Keep".to_string();
+        return extras.into_iter().map(|m| (m, Err(msg.clone()))).collect();
+    }
+    if let Err(e) = std::fs::create_dir_all(dest_dir) {
+        let msg = format!("Failed to create quarantine folder {}: {e}", dest_dir.display());
+        return extras.into_iter().map(|m| (m, Err(msg.clone()))).collect();
+    }
+    // Plan and execute sequentially per file so collision_suffixed_path sees earlier moves on disk.
+    extras
+        .into_iter()
+        .map(|member| {
+            let outcome = if member.parent() == Some(dest_dir) {
+                Err(format!(
+                    "{} is already inside quarantine folder {}",
+                    member.display(),
+                    dest_dir.display()
+                ))
+            } else {
+                plan_loss_proof_move(&member, dest_dir).and_then(|plan| execute_move_plan(&plan))
+            };
+            (member, outcome)
+        })
+        .collect()
+}
+
+pub fn prune_duplicate_groups_after_moves(
+    groups: &mut Vec<DuplicateGroup>,
+    moved_sources: &HashSet<PathBuf>,
+    root: Option<&Path>,
+) {
+    for group in groups.iter_mut() {
+        group.members.retain(|p| !moved_sources.contains(p));
+        let remaining: HashSet<PathBuf> = group.members.iter().cloned().collect();
+        group
+            .keep
+            .retain(|p| !moved_sources.contains(p) && remaining.contains(p));
+        if group.members.len() >= 2 && group.keep.is_empty() {
+            group.keep = default_keep_for_group(&group.members, root);
+        }
+    }
+    groups.retain(|g| g.members.len() >= 2);
 }
 
 /// A pinnable target for a detached inspector panel (018 decision 4). Only one
@@ -2712,6 +2872,23 @@ mod tests {
                 assert_ne!(labels[i], labels[j], "labels should be distinct");
             }
         }
+    }
+
+    #[test]
+    fn format_action_outcome_quarantine_duplicate() {
+        let outcome = ActionOutcome {
+            action: ActionKind::QuarantineDuplicate,
+            image: PathBuf::from("/a/dup.jpg"),
+            destination: Some(PathBuf::from("/a/duplicates/dup.jpg")),
+            result: ActionResult::Ok {
+                produced: Some(PathBuf::from("/a/duplicates/dup.jpg")),
+            },
+        };
+
+        let formatted = format_action_outcome(&outcome);
+
+        assert!(formatted.starts_with("Quarantine duplicate: "));
+        assert!(formatted.contains("/a/dup.jpg -> /a/duplicates/dup.jpg"));
     }
 
     // ---- Feature 016 T015: viewer_spawn_command (argument-vector safety) ----

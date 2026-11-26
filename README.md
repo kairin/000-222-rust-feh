@@ -197,13 +197,23 @@ Then you can run `./rust-feh` from the root.
 - **Filter and sort**: visible above the central list; Path / Name / Folder sort with scroll reset. Up, current path, List/Tree, and subfolder navigation stay with the browser.
 - **Open folder** loads a folder; native formats (jpg, png, webp, gif, bmp) plus optional ImageMagick identify for unlisted types
 - Select image in list; first image auto-selected on load — **feh does not auto-launch**
-- **Open in feh** and **More** are visible for the current selection; More reuses existing Save a copy, Move to, Resize, Convert, Copy path, and Copy image actions. Open in feh is a round-trip: closing it returns the viewed image to the preview. In a feh window opened with **Open in feh**, key `1` copies the shown image to `~/Pictures/picked` (created if missing; `cp -n`, so it never overwrites). It does not work in Saved feh launches or **Launch feh on optimized**.
+- **Open in feh** and **More** are visible for the current selection; More reuses existing Save a copy, Move to, Resize, Convert, Copy path, and Copy image actions. Open in feh is a round-trip: closing it returns the viewed image to the preview. In a feh window opened with **Open in feh**, key `1` copies the shown image to `~/Pictures/picked` (created if missing; `cp -n`, so it never overwrites). Key `1` does not work in Saved feh launches, **Launch feh on optimized**, or **Open group in feh**. Those standalone `feh` windows do not update the right Preview when you close them.
 - The selected image appears in a resizable right Preview; narrow windows switch to the same preview body with a Back to list control. Preview decoding remains asynchronous.
 - Graceful degradation when `feh` is missing (disabled buttons, clear status message)
 - Existing scan settings, Image Tools and pinning, saved feh launches, status/inventory, activity log, format support, and installed-tool recovery are available on demand from **Tools**.
 - **Feh-first scanning**: extension-only scan by default (~milliseconds on large photo folders); list fills incrementally; **Open in feh** works while scan runs; optional “Detect exotic formats (slow)” for ImageMagick deep scan
 - **Background scanning**: UI stays responsive on large or network paths; NAS/GVFS never run per-file ImageMagick identify
 - **Session status**: during a scan the pulse colour changes and a `| / - \` spinner turns
+
+### Exact duplicate detection
+
+Open `Tools -> Duplicates…` after a folder scan finishes. Click `Scan for duplicates` to run an on-demand exact byte-duplicate scan. This scan uses pure Rust `std` with zero new dependencies. Initial folder browsing stays fast because `rust-feh` reads file bytes only when you start this scan.
+
+When groups appear, toggle `Duplicates only` in the browser bar to filter the workspace. This toggle works in both Flat list and Folder tree views.
+
+Click a duplicate candidate row to select that image in the right Preview, which shows its pixel dimensions after decode. Click **Open group in feh** to check one group at full resolution in a standalone `feh --filelist` window.
+
+Mark each copy to retain with `Keep`, then click `Move to quarantine` to move the extra copies. You can choose the default `duplicates/` subfolder or another folder. At least one file per group stays marked `Keep`. Quarantine moves are collision-safe and verify copied byte lengths. `rust-feh` never deletes files automatically or in-app.
 
 Further work is possible in areas such as thumbnail grid, richer tools, or config, but no specific features are committed.
 
