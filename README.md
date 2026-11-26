@@ -205,6 +205,16 @@ Then you can run `./rust-feh` from the root.
 - **Background scanning**: UI stays responsive on large or network paths; NAS/GVFS never run per-file ImageMagick identify
 - **Session status**: during a scan the pulse colour changes and a `| / - \` spinner turns
 
+### Exact duplicate detection
+
+Open `Tools -> Duplicates…` after a folder scan finishes. Click `Scan for duplicates` to run an on-demand exact byte-duplicate scan. This scan uses pure Rust `std` with zero new dependencies. Initial folder browsing stays fast because `rust-feh` reads file bytes only when you start this scan.
+
+When groups appear, toggle `Duplicates only` in the browser bar to filter the workspace. This toggle works in both Flat list and Folder tree views.
+
+Click `Open group in feh` to check one duplicate group at full resolution before you move any file.
+
+Mark each copy to retain with `Keep`, then click `Move to quarantine` to move the extra copies. You can choose the default `duplicates/` subfolder or another folder. At least one file per group stays marked `Keep`. Quarantine moves are collision-safe and verify copied byte lengths. `rust-feh` never deletes files automatically or in-app.
+
 Further work is possible in areas such as thumbnail grid, richer tools, or config, but no specific features are committed.
 
 ## Architecture (high level)

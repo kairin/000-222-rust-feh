@@ -1,3 +1,14 @@
+## [2026-11-26] - Exact duplicate detection and safe quarantine
+
+Feature 020 adds exact byte-duplicate detection and safe quarantine moves.
+
+### Added
+
+- Added `Tools -> Duplicates…` for on-demand exact byte-duplicate scans using pure Rust `std` with zero new dependencies.
+- Added the `Duplicates only` filter toggle in the browser bar for Flat list and Folder tree views.
+- Added `Open group in feh` to inspect a duplicate group at full resolution before any move.
+- Added sequential, collision-safe `Move to quarantine` moves into `duplicates/` or a chosen folder with at least one `Keep` file, byte verification, and zero file deletion.
+
 ## [2026-11-23] — Documentation and repository cleanup
 
 Cleanup after a multi-architect staleness audit (#178–#193). Behaviour is unchanged. One tool label was renamed, and the in-app install hints are now distro-neutral (#190).

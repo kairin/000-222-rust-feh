@@ -82,9 +82,9 @@ After `T003` passes, the orchestrator may run **Stream 3A** (`T004 -> T005`), **
 
 ## Phase 7: Security Audit, Docs, and Final Gate
 
-- [ ] T014 [Role: Orchestrator | Write: none | Deps: `T013`] Run the `.agents/GUARDRAILS.md` security audit on `git diff`: confirm `Command` arg vectors have zero shell interpolation of image paths, `symlink_metadata` blocks symlink traversal, `quarantine_group_extras` runs sequentially with `create_dir_all`, and zero `remove_file` calls exist outside `execute_move_plan` and `filelist-dup-<pid>.txt` temp cleanup.
-- [ ] T015 [P] [Role: Worker (Haiku/Luna) | Write: `README.md`, `CHANGELOG.md` | Deps: `T013`] Document `Tools -> Duplicates`, `Duplicates only`, `Open group in feh`, and the zero-deletion quarantine workflow in `README.md` and `CHANGELOG.md` (lint prose with `ste-lint.py`).
-- [ ] T016 [Role: Orchestrator | Write: `specs/020-duplicate-detection/validation-results.md` | Deps: `T014`, `T015`] Run `cargo test --locked --verbose`, `cargo clippy --locked --all-targets -- -D warnings`, `cargo test sc003_filter_10k_under_200ms -- --exact --nocapture`, `cargo build --release`, and `git diff --exit-code Cargo.toml Cargo.lock .gitignore .envrc .github/`. Record command outputs in `specs/020-duplicate-detection/validation-results.md`.
+- [x] T014 [Role: Orchestrator | Write: none | Deps: `T013`] Run the `.agents/GUARDRAILS.md` security audit on `git diff`: confirm `Command` arg vectors have zero shell interpolation of image paths, `symlink_metadata` blocks symlink traversal, `quarantine_group_extras` runs sequentially with `create_dir_all`, and zero `remove_file` calls exist outside `execute_move_plan` and `filelist-dup-<pid>.txt` temp cleanup.
+- [x] T015 [P] [Role: Worker (Haiku/Luna) | Write: `README.md`, `CHANGELOG.md` | Deps: `T013`] Document `Tools -> Duplicates`, `Duplicates only`, `Open group in feh`, and the zero-deletion quarantine workflow in `README.md` and `CHANGELOG.md` (lint prose with `ste-lint.py`).
+- [x] T016 [Role: Orchestrator | Write: `specs/020-duplicate-detection/validation-results.md` | Deps: `T014`, `T015`] Run `cargo test --locked --verbose`, `cargo clippy --locked --all-targets -- -D warnings`, `cargo test sc003_filter_10k_under_200ms -- --exact --nocapture`, `cargo build --release`, and `git diff --exit-code Cargo.toml Cargo.lock .gitignore .envrc .github/`. Record command outputs in `specs/020-duplicate-detection/validation-results.md`.
 
 ---
 
