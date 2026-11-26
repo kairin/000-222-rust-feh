@@ -48,6 +48,7 @@ fn app(dir: &Path, paths: &[PathBuf]) -> RustFehApp {
         ),
     );
     app.current_dir = Some(dir.to_path_buf());
+    app.action_prefs_file = dir.join("action-prefs.json");
     app.images = paths.iter().cloned().map(ImageEntry::new).collect();
     app.scan_inventory = Some(ScanInventory::from_entries(&app.images, 7, true));
     app
@@ -208,4 +209,118 @@ fn moving_final_entry_clears_selection_and_counts() {
     assert_eq!(app.compute_list_indices(), (0, vec![]));
     assert!(render_tree(&mut app).is_empty());
     assert_inventory(&app);
+}
+
+#[test]
+fn quarantine_dialog_cancel_has_no_side_effects() {
+    let f = Fixture::new();
+    let source = f.image("a.png");
+    let mut app = app(&f.0, std::slice::from_ref(&source));
+    let (tx, rx) = mpsc::channel();
+    app.pending_dialog = Some(PendingFileDialog {
+        target: DialogTarget::QuarantineFolder,
+        rx,
+    });
+    assert!(!app.can_open_file_dialog());
+    app.poll_file_dialog();
+    assert!(!app.can_open_file_dialog());
+
+    tx.send(None).unwrap();
+    app.poll_file_dialog();
+    assert!(app.can_open_file_dialog());
+    assert_eq!(app.duplicates.quarantine_mode, QuarantineMode::DefaultSubfolder);
+    assert_eq!(app.action_prefs.last_destination, None);
+    assert!(!app.action_prefs_file.exists());
+}
+
+#[test]
+fn quarantine_dialog_selection_updates_mode_and_persists_prefs() {
+    let f = Fixture::new();
+    let source = f.image("a.png");
+    let custom_dir = f.0.join("custom-quarantine");
+    std::fs::create_dir_all(&custom_dir).unwrap();
+    let mut app = app(&f.0, std::slice::from_ref(&source));
+    let (tx, rx) = mpsc::channel();
+    app.pending_dialog = Some(PendingFileDialog {
+        target: DialogTarget::QuarantineFolder,
+        rx,
+    });
+
+    tx.send(Some(custom_dir.clone())).unwrap();
+    app.poll_file_dialog();
+    assert!(app.can_open_file_dialog());
+    assert_eq!(
+        app.duplicates.quarantine_mode,
+        QuarantineMode::CustomDir(custom_dir.clone())
+    );
+    assert_eq!(app.action_prefs.last_destination, Some(custom_dir.clone()));
+    assert_eq!(
+        rust_feh::ui_logic::load_action_prefs_from(&app.action_prefs_file).last_destination,
+        Some(custom_dir)
+    );
+}
+
+#[test]
+fn save_copy_and_move_to_dialogs_apply_via_channel() {
+    let f = Fixture::new();
+    let first = f.image("a.png");
+    let second = f.image("b.png");
+    let copy_dir = f.0.join("copies");
+    let move_dir = f.0.join("moved");
+    std::fs::create_dir_all(&copy_dir).unwrap();
+    std::fs::create_dir_all(&move_dir).unwrap();
+    let mut app = app(&f.0, &[first.clone(), second.clone()]);
+    app.selected = Some(first.clone());
+
+    let (tx1, rx1) = mpsc::channel();
+    app.pending_dialog = Some(PendingFileDialog {
+        target: DialogTarget::SaveCopyTo {
+            source: first.clone(),
+        },
+        rx: rx1,
+    });
+    tx1.send(Some(copy_dir.clone())).unwrap();
+    app.poll_file_dialog();
+    assert!(copy_dir.join("a.png").is_file());
+    assert!(first.is_file());
+
+    let (tx2, rx2) = mpsc::channel();
+    app.pending_dialog = Some(PendingFileDialog {
+        target: DialogTarget::MoveTo {
+            source: first.clone(),
+        },
+        rx: rx2,
+    });
+    tx2.send(Some(move_dir.clone())).unwrap();
+    app.poll_file_dialog();
+    assert!(move_dir.join("a.png").is_file());
+    assert!(!first.exists());
+    assert_eq!(app.selected, Some(second));
+}
+
+#[test]
+fn cache_root_and_passkey_dialogs_apply_via_channel() {
+    let f = Fixture::new();
+    let source = f.image("a.png");
+    let root_dir = f.0.join("cache-root");
+    let passkey_file = f.0.join("passkey.txt");
+    let mut app = app(&f.0, std::slice::from_ref(&source));
+
+    let (tx1, rx1) = mpsc::channel();
+    app.pending_dialog = Some(PendingFileDialog {
+        target: DialogTarget::CacheRoot,
+        rx: rx1,
+    });
+    tx1.send(Some(root_dir.clone())).unwrap();
+    app.poll_file_dialog();
+    assert_eq!(app.cache_config.root, Some(root_dir));
+
+    let (tx2, rx2) = mpsc::channel();
+    app.pending_dialog = Some(PendingFileDialog {
+        target: DialogTarget::CachePasskey,
+        rx: rx2,
+    });
+    tx2.send(Some(passkey_file.clone())).unwrap();
+    app.poll_file_dialog();
+    assert_eq!(app.cache_config.passkey_path, Some(passkey_file));
 }
