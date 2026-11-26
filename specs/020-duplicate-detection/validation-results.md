@@ -6,6 +6,8 @@
 
 **Architect Review**: `gemini-4-argon-high` (`SOUND_WITH_REFINEMENTS`, all eight refinements applied before task dispatch)
 
+The follow-up Astra subagent reviewed the implementation at `6d95dad` and found no demonstrated feature defect that required expanding the scope. It identified gaps in the evidence for cross-filesystem moves, cancellation during active reads, and desktop interaction. A local cross-device probe subsequently covered the move through the production quarantine helper.
+
 ## Verification Commands and Results
 
 | Command | Exit Code | Result |
@@ -17,20 +19,22 @@
 | `git diff --exit-code main -- Cargo.toml Cargo.lock .gitignore .envrc .github/` | `0` | Zero changes to dependencies, lockfile, ignore rules, env, or CI. |
 | `cargo clippy --locked --all-targets -- -D warnings` | Not run | `clippy-driver` is absent on this host (`.agents/ENV.md`). `RUSTFLAGS="-D warnings"` ran locally, and CI runs `cargo clippy`. |
 
+The follow-up run passed 258 tests with 3 ignored using `RUSTFLAGS="-D warnings" cargo test --offline --locked --verbose` and built the release binary with `cargo build --offline --locked --release`. Three tests in the first run could not write to the sandboxed home cache. They passed when rerun with access to that cache. The focused filter check passed in 0.01 s. Both Clippy and rustfmt were unavailable locally.
+
 ## Success Criteria Matrix
 
 | ID | Criterion | Status | Evidence |
 |----|-----------|--------|----------|
 | SC-001 | Zero false positives or negatives on exact, differing, hardlink, and 0-byte fixtures | PASS (automated) | 10 unit tests in `tests/unit/duplicate_scan.rs`. |
-| SC-002 | Zero data loss or overwrite across moves and same-basename collisions | PASS (automated) | 7 integration tests in `tests/integration/feature_016_actions.rs`. |
-| SC-003 | Zero regression in initial folder listing or 10k filter speed | PASS (automated) | `scan_images_streaming` stays unchanged, and `sc003_filter_10k_under_200ms` finished in `0.01s`. |
-| SC-004 | Zero content reads for size-unique files and 1 open FD max in Stage B/C | PASS (automated + audit) | `read_chunk_at` (`src/scanner.rs:421-438`) opens and drops one `File` handle at a time. Unique sizes drop at Stage A (`src/scanner.rs:572-574`). |
-| SC-005 | `Cancel` and folder rescan stop reads within one 64 KiB chunk and drop stale generations | PASS (automated + audit) | `pre_cancelled_scan_stops_cleanly_and_emits_complete` (`tests/unit/duplicate_scan.rs:201-211`) and `poll_duplicate_job` (`src/main.rs:2340-2373`). |
-| SC-006 | Full test suite and release build pass with zero `Cargo.toml` additions | PASS (automated) | Passed `258` tests and release build with empty `Cargo.toml` and `Cargo.lock` diffs. |
+| SC-002 | Preserve files across same-filesystem and cross-filesystem moves and name collisions | PASS (fixtures) | Seven quarantine integration tests cover guards, collisions and pruning. A separate local probe called `quarantine_group_extras` across different filesystem devices. Two same-named copies moved to distinct paths with exact bytes, and the Keep copy and existing destination file stayed intact. |
+| SC-003 | Preserve initial folder listing and 10k filter speed | Filter passed, listing inspected | `sc003_filter_10k_under_200ms` finished in 0.01 s. The initial `scan_images_streaming` path was unchanged in the diff. No fresh listing benchmark was run. |
+| SC-004 | Zero content reads for 10k size-unique files and at most one open file descriptor during reads | Code inspection | Stage A drops unique sizes before content reads. `read_chunk_at` opens and drops one file handle per read. The review did not instrument a 10k-file run. |
+| SC-005 | `Cancel` and folder rescan stop reads within one 64 KiB chunk and drop stale generations | Pre-cancel test and code inspection | `pre_cancelled_scan_stops_cleanly_and_emits_complete` covers an already-cancelled scan. The code checks cancellation before each chunk and rejects stale generations. Active-read cancellation timing and interactive rescan were not measured. |
+| SC-006 | Tests, Clippy and release build pass with zero manifest additions | Tests and build passed, local Clippy unavailable | 258 tests passed and the release build succeeded. `Cargo.toml` and `Cargo.lock` had no changes. |
 
 ## Security Audit (`T014`)
 
-- **Zero user-file deletion (`FR-001`)**: `git diff main -- src/` adds only `remove_file(feh_duplicate_temp_path())` inside `Drop` (`src/main.rs:601`, `filelist-dup-<pid>.txt` cache cleanup). Zero user images are deleted anywhere.
+- **No permanent delete action (`FR-001`)**: The only new direct `remove_file` call removes the temporary `feh` filelist. Quarantine reuses the move helper, which removes the source on a cross-filesystem move after verifying the destination.
 - **Subprocess safety**: `duplicate_group_spawn_command` (`src/ui_logic.rs:85-106`) and `open_duplicate_group_in_feh` (`src/main.rs:2179-2208`) pass discrete `Vec<String>` items to `Command::new("feh").args(&args)` with zero shell interpolation.
 - **Symlink boundary**: `collect_stage_a_buckets` (`src/scanner.rs:479`) calls `std::fs::symlink_metadata` and skips non-regular files.
 - **Quarantine safety**: `quarantine_group_extras` (`src/ui_logic.rs:1759-1796`) requires `group.keep.len() >= 1`, creates `dest_dir` with `create_dir_all`, rejects files already in `dest_dir`, and interleaves `plan_loss_proof_move` plus `execute_move_plan` per file.
@@ -53,4 +57,5 @@
 ## Limitations
 
 - `cargo clippy` is not installed on this host (`.agents/ENV.md`). Local runs enforced `RUSTFLAGS="-D warnings"`.
-- Automated tests cover scanner stages, UI state, `feh` argument vectors, and filesystem quarantine moves. Interactive desktop clicks on `Tools -> Duplicates…` remain available for manual review via `./target/release/rust-feh`.
+- Automated tests cover scanner stages, UI state, `feh` argument vectors, and filesystem quarantine moves. The follow-up did not run an interactive desktop walkthrough of `Tools -> Duplicates…`.
+- The shared `feh` filelist writes one displayed path per line. Filenames containing newlines or non-UTF-8 bytes may not round-trip through it.
