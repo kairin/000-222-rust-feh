@@ -4,8 +4,8 @@
 use crate::types::{
     ActionKind, ActionOutcome, ActionPrefs, ActionResult, AssetStatus, ContextAction,
     DuplicateGroup, FehLaunchEntry, FehLaunchList, FileStatus, ImageEntry, ListViewMode,
-    OutputPolicy, ProcessedResult, ScanInventory, SortMode, StageState, WindowPreferences,
-    WindowSizePreset,
+    OutputPolicy, ProcessedResult, QuarantineMode, ScanInventory, SortMode, StageState,
+    WindowPreferences, WindowSizePreset,
 };
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::io::Write;
@@ -76,6 +76,10 @@ pub fn feh_entry_filelist_path(entry_id: &str) -> PathBuf {
 
 pub fn feh_duplicate_group_filelist_path(cache_dir: &Path, pid: u32) -> PathBuf {
     cache_dir.join(format!("filelist-dup-{pid}.txt"))
+}
+
+pub fn feh_duplicate_temp_path() -> PathBuf {
+    feh_duplicate_group_filelist_path(&runtime_cache_dir(), std::process::id())
 }
 
 pub fn duplicate_group_spawn_command(
@@ -1724,6 +1728,83 @@ pub fn active_duplicate_path_set(groups: &[DuplicateGroup]) -> HashSet<PathBuf> 
         .iter()
         .flat_map(|g| g.members.iter().cloned())
         .collect()
+}
+
+pub fn toggle_group_keep(group: &mut DuplicateGroup, candidate: &Path) -> bool {
+    if group.keep.contains(candidate) {
+        if group.keep.len() <= 1 {
+            return false;
+        }
+        group.keep.remove(candidate);
+        true
+    } else {
+        group.keep.insert(candidate.to_path_buf());
+        true
+    }
+}
+
+pub fn resolve_quarantine_dir(current_dir: &Path, mode: &QuarantineMode) -> PathBuf {
+    match mode {
+        QuarantineMode::DefaultSubfolder => current_dir.join("duplicates"),
+        QuarantineMode::CustomDir(dir) => dir.clone(),
+    }
+}
+
+pub fn quarantine_group_extras(
+    group: &DuplicateGroup,
+    dest_dir: &Path,
+) -> Vec<(PathBuf, Result<PathBuf, String>)> {
+    let extras: Vec<PathBuf> = group
+        .members
+        .iter()
+        .filter(|m| !group.keep.contains(*m))
+        .cloned()
+        .collect();
+    if extras.is_empty() {
+        return Vec::new();
+    }
+    if group.keep.is_empty() || !group.members.iter().any(|m| group.keep.contains(m)) {
+        let msg = "At least one file in the group must remain marked Keep".to_string();
+        return extras.into_iter().map(|m| (m, Err(msg.clone()))).collect();
+    }
+    if let Err(e) = std::fs::create_dir_all(dest_dir) {
+        let msg = format!("Failed to create quarantine folder {}: {e}", dest_dir.display());
+        return extras.into_iter().map(|m| (m, Err(msg.clone()))).collect();
+    }
+    // Plan and execute sequentially per file so collision_suffixed_path sees earlier moves on disk.
+    extras
+        .into_iter()
+        .map(|member| {
+            let outcome = if member.parent() == Some(dest_dir) {
+                Err(format!(
+                    "{} is already inside quarantine folder {}",
+                    member.display(),
+                    dest_dir.display()
+                ))
+            } else {
+                plan_loss_proof_move(&member, dest_dir).and_then(|plan| execute_move_plan(&plan))
+            };
+            (member, outcome)
+        })
+        .collect()
+}
+
+pub fn prune_duplicate_groups_after_moves(
+    groups: &mut Vec<DuplicateGroup>,
+    moved_sources: &HashSet<PathBuf>,
+    root: Option<&Path>,
+) {
+    for group in groups.iter_mut() {
+        group.members.retain(|p| !moved_sources.contains(p));
+        let remaining: HashSet<PathBuf> = group.members.iter().cloned().collect();
+        group
+            .keep
+            .retain(|p| !moved_sources.contains(p) && remaining.contains(p));
+        if group.members.len() >= 2 && group.keep.is_empty() {
+            group.keep = default_keep_for_group(&group.members, root);
+        }
+    }
+    groups.retain(|g| g.members.len() >= 2);
 }
 
 /// A pinnable target for a detached inspector panel (018 decision 4). Only one

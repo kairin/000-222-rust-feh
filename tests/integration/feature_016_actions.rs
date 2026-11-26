@@ -325,3 +325,211 @@ fn actions_work_with_spaces_and_non_ascii_names() {
 
     let _ = fs::remove_dir_all(&dir);
 }
+
+mod feature_020_duplicates {
+    use std::collections::HashSet;
+    use std::fs;
+    use std::path::{Path, PathBuf};
+
+    use rust_feh::types::{DuplicateGroup, QuarantineMode};
+    use rust_feh::ui_logic::{
+        prune_duplicate_groups_after_moves, quarantine_group_extras, resolve_quarantine_dir,
+        toggle_group_keep,
+    };
+
+    fn setup_temp_dir(name: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("rust-feh-020-{name}-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    #[test]
+    fn toggle_group_keep_enforces_at_least_one_keep() {
+        let a = PathBuf::from("/tmp/a.jpg");
+        let b = PathBuf::from("/tmp/b.jpg");
+        let mut group = DuplicateGroup {
+            byte_len: 10,
+            members: vec![a.clone(), b.clone()],
+            keep: HashSet::from([a.clone()]),
+        };
+
+        assert!(!toggle_group_keep(&mut group, &a));
+        assert_eq!(group.keep.len(), 1);
+        assert!(group.keep.contains(&a));
+
+        assert!(toggle_group_keep(&mut group, &b));
+        assert_eq!(group.keep.len(), 2);
+        assert!(group.keep.contains(&b));
+
+        assert!(toggle_group_keep(&mut group, &a));
+        assert_eq!(group.keep.len(), 1);
+        assert!(!group.keep.contains(&a));
+        assert!(group.keep.contains(&b));
+    }
+
+    #[test]
+    fn resolve_quarantine_dir_handles_default_and_custom() {
+        let current = Path::new("/tmp/photos");
+        assert_eq!(
+            resolve_quarantine_dir(current, &QuarantineMode::DefaultSubfolder),
+            current.join("duplicates")
+        );
+        let custom = PathBuf::from("/tmp/custom-quarantine");
+        assert_eq!(
+            resolve_quarantine_dir(current, &QuarantineMode::CustomDir(custom.clone())),
+            custom
+        );
+    }
+
+    #[test]
+    fn quarantine_group_extras_creates_dir_and_handles_same_basename_collisions() {
+        let dir = setup_temp_dir("same-basename");
+        let keep_path = dir.join("keep.jpg");
+        let sub1_dup = dir.join("sub1").join("dup.jpg");
+        let sub2_dup = dir.join("sub2").join("dup.jpg");
+        fs::create_dir_all(sub1_dup.parent().unwrap()).unwrap();
+        fs::create_dir_all(sub2_dup.parent().unwrap()).unwrap();
+        let bytes = b"identical-image-payload-020";
+        fs::write(&keep_path, bytes).unwrap();
+        fs::write(&sub1_dup, bytes).unwrap();
+        fs::write(&sub2_dup, bytes).unwrap();
+
+        let dest_dir = dir.join("duplicates");
+        assert!(!dest_dir.exists());
+        let group = DuplicateGroup {
+            byte_len: bytes.len() as u64,
+            members: vec![keep_path.clone(), sub1_dup.clone(), sub2_dup.clone()],
+            keep: HashSet::from([keep_path.clone()]),
+        };
+
+        let results = quarantine_group_extras(&group, &dest_dir);
+        assert!(dest_dir.is_dir());
+        assert_eq!(results.len(), 2);
+        assert_eq!(fs::read(&keep_path).unwrap(), bytes);
+        assert!(!sub1_dup.exists() && !sub2_dup.exists());
+
+        let mut moved_paths = HashSet::new();
+        for (_, res) in results {
+            let dest = res.expect("quarantine move should succeed");
+            assert_eq!(dest.parent(), Some(dest_dir.as_path()));
+            assert_eq!(fs::read(&dest).unwrap(), bytes);
+            assert!(moved_paths.insert(dest));
+        }
+        assert_eq!(moved_paths.len(), 2);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn quarantine_group_extras_preserves_preexisting_file_in_dest_dir() {
+        let dir = setup_temp_dir("preexisting-dest");
+        let dest_dir = dir.join("duplicates");
+        fs::create_dir_all(&dest_dir).unwrap();
+        let preexisting = dest_dir.join("dup.jpg");
+        let preexisting_bytes = b"preexisting-unrelated-bytes";
+        fs::write(&preexisting, preexisting_bytes).unwrap();
+
+        let keep_path = dir.join("keep.jpg");
+        let sub1_dup = dir.join("sub1").join("dup.jpg");
+        let sub2_dup = dir.join("sub2").join("dup.jpg");
+        fs::create_dir_all(sub1_dup.parent().unwrap()).unwrap();
+        fs::create_dir_all(sub2_dup.parent().unwrap()).unwrap();
+        let bytes = b"duplicate-bytes";
+        fs::write(&keep_path, bytes).unwrap();
+        fs::write(&sub1_dup, bytes).unwrap();
+        fs::write(&sub2_dup, bytes).unwrap();
+
+        let group = DuplicateGroup {
+            byte_len: bytes.len() as u64,
+            members: vec![keep_path.clone(), sub1_dup, sub2_dup],
+            keep: HashSet::from([keep_path]),
+        };
+
+        let results = quarantine_group_extras(&group, &dest_dir);
+        assert_eq!(results.len(), 2);
+        assert_eq!(fs::read(&preexisting).unwrap(), preexisting_bytes);
+        for (_, res) in results {
+            let dest = res.expect("suffixed quarantine move should succeed");
+            assert_ne!(dest, preexisting);
+            assert_eq!(fs::read(&dest).unwrap(), bytes);
+        }
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn quarantine_group_extras_rejects_member_already_in_dest_dir() {
+        let dir = setup_temp_dir("already-in-dest");
+        let dest_dir = dir.join("duplicates");
+        fs::create_dir_all(&dest_dir).unwrap();
+        let keep_path = dir.join("keep.jpg");
+        let in_dest = dest_dir.join("dup.jpg");
+        let bytes = b"dup-bytes";
+        fs::write(&keep_path, bytes).unwrap();
+        fs::write(&in_dest, bytes).unwrap();
+
+        let group = DuplicateGroup {
+            byte_len: bytes.len() as u64,
+            members: vec![keep_path.clone(), in_dest.clone()],
+            keep: HashSet::from([keep_path]),
+        };
+
+        let results = quarantine_group_extras(&group, &dest_dir);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].0, in_dest);
+        assert!(results[0].1.is_err());
+        assert_eq!(fs::read(&in_dest).unwrap(), bytes);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn quarantine_group_extras_rejects_empty_keep_guard() {
+        let dir = setup_temp_dir("empty-keep");
+        let dest_dir = dir.join("duplicates");
+        let a = dir.join("a.jpg");
+        let b = dir.join("b.jpg");
+        fs::write(&a, b"same").unwrap();
+        fs::write(&b, b"same").unwrap();
+
+        let group = DuplicateGroup {
+            byte_len: 4,
+            members: vec![a.clone(), b.clone()],
+            keep: HashSet::new(),
+        };
+
+        let results = quarantine_group_extras(&group, &dest_dir);
+        assert!(!results.is_empty());
+        assert!(results.iter().all(|(_, res)| res.is_err()));
+        assert!(a.is_file() && b.is_file());
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn prune_duplicate_groups_drops_resolved_and_reseeds_keep() {
+        let root = PathBuf::from("/tmp/photos");
+        let a = root.join("a.jpg");
+        let b = root.join("sub/b.jpg");
+        let c = root.join("c.jpg");
+        let d = root.join("d.jpg");
+        let e = root.join("nested/e.jpg");
+
+        let mut groups = vec![
+            DuplicateGroup {
+                byte_len: 20,
+                members: vec![a.clone(), b.clone()],
+                keep: HashSet::from([a.clone()]),
+            },
+            DuplicateGroup {
+                byte_len: 10,
+                members: vec![c.clone(), d.clone(), e.clone()],
+                keep: HashSet::from([c.clone()]),
+            },
+        ];
+        let moved = HashSet::from([b, c]);
+
+        prune_duplicate_groups_after_moves(&mut groups, &moved, Some(&root));
+        assert_eq!(groups.len(), 1);
+        assert_eq!(groups[0].members, vec![d.clone(), e]);
+        assert!(!groups[0].keep.is_empty());
+        assert!(groups[0].keep.contains(&d));
+    }
+}

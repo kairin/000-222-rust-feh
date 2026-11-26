@@ -60,11 +60,11 @@ After `T003` passes, the orchestrator may run **Stream 3A** (`T004 -> T005`), **
 
 ### Tests for User Story 3 (Write FIRST and confirm failure before T010)
 
-- [ ] T009 [Role: Worker (Haiku/Luna) | Write: `tests/integration/feature_016_actions.rs` | Deps: `T005`, `T008`] Add a `feature_020_duplicates` test module inside `tests/integration/feature_016_actions.rs` (leaving `Cargo.toml` untouched) testing: refusal to uncheck the sole `Keep` path, `create_dir_all` creation of `<current_dir>/duplicates`, sequential move of two same-basename files from different subfolders (`sub1/dup.jpg`, `sub2/dup.jpg`) producing distinct suffixed files with identical bytes, rejection of files already inside `dest_dir`, group pruning, and zero deleted files.
+- [x] T009 [Role: Worker (Haiku/Luna) | Write: `tests/integration/feature_016_actions.rs` | Deps: `T005`, `T008`] Add a `feature_020_duplicates` test module inside `tests/integration/feature_016_actions.rs` (leaving `Cargo.toml` untouched) testing: refusal to uncheck the sole `Keep` path, `create_dir_all` creation of `<current_dir>/duplicates`, sequential move of two same-basename files from different subfolders (`sub1/dup.jpg`, `sub2/dup.jpg`) producing distinct suffixed files with identical bytes, rejection of files already inside `dest_dir`, group pruning, and zero deleted files.
 
 ### Implementation for User Story 3
 
-- [ ] T010 [Role: Worker (Haiku/Luna) | Write: `src/ui_logic.rs` | Deps: `T009`] Implement `toggle_group_keep` (`keep.len() >= 1`), `resolve_quarantine_dir`, `quarantine_group_extras` (`create_dir_all` once, reject `parent == Some(dest_dir)`, and interleave `plan_loss_proof_move` + `execute_move_plan` sequentially per file), and `prune_duplicate_groups_after_moves` in `src/ui_logic.rs`. Verify: `cargo test --locked --test feature_016_actions` passes.
+- [x] T010 [Role: Worker (Haiku/Luna) | Write: `src/ui_logic.rs` | Deps: `T009`] Implement `toggle_group_keep` (`keep.len() >= 1`), `resolve_quarantine_dir`, `quarantine_group_extras` (`create_dir_all` once, reject `parent == Some(dest_dir)`, and interleave `plan_loss_proof_move` + `execute_move_plan` sequentially per file), and `prune_duplicate_groups_after_moves` in `src/ui_logic.rs`. Verify: `cargo test --locked --test feature_016_actions` passes.
 
 **Checkpoint**: All library, unit, and integration suites pass before GUI wiring.
 
