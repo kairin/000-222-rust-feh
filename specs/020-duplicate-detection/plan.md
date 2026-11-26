@@ -51,7 +51,7 @@ Add on-demand exact duplicate detection, full-size group inspection in `feh`, a 
   - `pub fn toggle_group_keep(group: &mut DuplicateGroup, candidate: &Path) -> bool`
   - `pub fn active_duplicate_path_set(groups: &[DuplicateGroup]) -> HashSet<PathBuf>`
   - `pub fn list_indices_with_duplicates(images: &[ImageEntry], root: Option<&Path>, search: &str, sort: SortMode, duplicate_paths: Option<&HashSet<PathBuf>>) -> Vec<usize>`
-  - `pub fn tree_visible_rows_with_duplicates(images: &[ImageEntry], root: Option<&Path>, search: &str, sort: SortMode, expanded: &HashSet<PathBuf>, root_skipped: usize, duplicate_paths: Option<&HashSet<PathBuf>>) -> Vec<TreeRow>`
+  - `pub fn tree_visible_rows_with_duplicates(images: &[ImageEntry], root: Option<&Path>, search: &str, sort: SortMode, expanded: &HashSet<String>, root_skipped: usize, duplicate_paths: Option<&HashSet<PathBuf>>) -> Vec<TreeRow>`
   - `pub fn feh_duplicate_group_filelist_path(cache_dir: &Path, pid: u32) -> PathBuf`
   - `pub fn duplicate_group_spawn_command(filelist_path: &Path, members: &[PathBuf]) -> Result<(String, Vec<String>), String>`
   - `pub fn resolve_quarantine_dir(current_dir: &Path, mode: &QuarantineMode) -> PathBuf`

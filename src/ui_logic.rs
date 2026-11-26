@@ -3,8 +3,9 @@
 
 use crate::types::{
     ActionKind, ActionOutcome, ActionPrefs, ActionResult, AssetStatus, ContextAction,
-    FehLaunchEntry, FehLaunchList, FileStatus, ImageEntry, ListViewMode, OutputPolicy,
-    ProcessedResult, ScanInventory, SortMode, StageState, WindowPreferences, WindowSizePreset,
+    DuplicateGroup, FehLaunchEntry, FehLaunchList, FileStatus, ImageEntry, ListViewMode,
+    OutputPolicy, ProcessedResult, ScanInventory, SortMode, StageState, WindowPreferences,
+    WindowSizePreset,
 };
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::io::Write;
@@ -71,6 +72,33 @@ pub fn feh_filelist_temp_path() -> PathBuf {
 /// Per-entry feh filelist path so Launch All can write distinct lists concurrently.
 pub fn feh_entry_filelist_path(entry_id: &str) -> PathBuf {
     runtime_cache_dir().join(format!("filelist-{}-{}.txt", std::process::id(), entry_id))
+}
+
+pub fn feh_duplicate_group_filelist_path(cache_dir: &Path, pid: u32) -> PathBuf {
+    cache_dir.join(format!("filelist-dup-{pid}.txt"))
+}
+
+pub fn duplicate_group_spawn_command(
+    filelist_path: &Path,
+    members: &[PathBuf],
+) -> Result<(String, Vec<String>), String> {
+    let Some(start_at) = members.first() else {
+        return Err("Duplicate group has no members".to_string());
+    };
+    write_feh_filelist_to(filelist_path, members)
+        .map_err(|e| format!("Failed to write duplicate filelist: {e}"))?;
+    let args = vec![
+        "-g".to_string(),
+        FEH_VIEWER_GEOMETRY.to_string(),
+        "--scale-down".to_string(),
+        "--zoom".to_string(),
+        FEH_VIEWER_ZOOM.to_string(),
+        "--start-at".to_string(),
+        start_at.display().to_string(),
+        "--filelist".to_string(),
+        filelist_path.display().to_string(),
+    ];
+    Ok(("feh".to_string(), args))
 }
 
 /// POSIX single-quote escaping: wrap `s` in single quotes and replace every
@@ -645,7 +673,20 @@ pub fn list_indices(
     search: &str,
     sort: SortMode,
 ) -> Vec<usize> {
+    list_indices_with_duplicates(images, root, search, sort, None)
+}
+
+pub fn list_indices_with_duplicates(
+    images: &[ImageEntry],
+    root: Option<&Path>,
+    search: &str,
+    sort: SortMode,
+    duplicate_paths: Option<&HashSet<PathBuf>>,
+) -> Vec<usize> {
     let mut indices = filter_indices(images, root, search);
+    if let Some(dset) = duplicate_paths {
+        indices.retain(|&i| dset.contains(&images[i].path));
+    }
     indices.sort_by_cached_key(|&a| sort_key(images, a, sort, root));
     indices
 }
@@ -960,7 +1001,19 @@ pub fn tree_visible_rows(
     expanded: &HashSet<String>,
     root_skipped: usize,
 ) -> Vec<TreeRow> {
-    let indices = list_indices(images, root, search, sort);
+    tree_visible_rows_with_duplicates(images, root, search, sort, expanded, root_skipped, None)
+}
+
+pub fn tree_visible_rows_with_duplicates(
+    images: &[ImageEntry],
+    root: Option<&Path>,
+    search: &str,
+    sort: SortMode,
+    expanded: &HashSet<String>,
+    root_skipped: usize,
+    duplicate_paths: Option<&HashSet<PathBuf>>,
+) -> Vec<TreeRow> {
+    let indices = list_indices_with_duplicates(images, root, search, sort, duplicate_paths);
     let effective = effective_expanded_paths(images, root, search, &indices, expanded);
     let tree = build_folder_tree(images, root, &indices);
     let mut rows = Vec::new();
@@ -1639,11 +1692,12 @@ pub enum InspectorSection {
     ActivityLog,
     Dependencies,
     FormatDiscovery,
+    Duplicates,
 }
 
 impl InspectorSection {
     /// Deterministic dispatch order for visible tool windows.
-    pub const ALL: [InspectorSection; 7] = [
+    pub const ALL: [InspectorSection; 8] = [
         InspectorSection::Browse,
         InspectorSection::ImageActions,
         InspectorSection::FehInstances,
@@ -1651,7 +1705,25 @@ impl InspectorSection {
         InspectorSection::ActivityLog,
         InspectorSection::Dependencies,
         InspectorSection::FormatDiscovery,
+        InspectorSection::Duplicates,
     ];
+}
+
+pub fn default_keep_for_group(members: &[PathBuf], root: Option<&Path>) -> HashSet<PathBuf> {
+    let best = members.iter().min_by_key(|path| {
+        let rel = root
+            .and_then(|r| path.strip_prefix(r).ok())
+            .unwrap_or(path.as_path());
+        (rel.components().count(), rel.as_os_str().len(), *path)
+    });
+    best.cloned().into_iter().collect()
+}
+
+pub fn active_duplicate_path_set(groups: &[DuplicateGroup]) -> HashSet<PathBuf> {
+    groups
+        .iter()
+        .flat_map(|g| g.members.iter().cloned())
+        .collect()
 }
 
 /// A pinnable target for a detached inspector panel (018 decision 4). Only one

@@ -2676,6 +2676,7 @@ impl RustFehApp {
             InspectorSection::ActivityLog => ("Activity log", 520.0),
             InspectorSection::Dependencies => ("Installed tools", 420.0),
             InspectorSection::FormatDiscovery => ("Format support", 480.0),
+            InspectorSection::Duplicates => ("Duplicates", 480.0),
         }
     }
 
@@ -2757,6 +2758,7 @@ impl RustFehApp {
                     InspectorSection::ActivityLog => self.render_activity_log_body(ui, ctx),
                     InspectorSection::Dependencies => self.render_deps_section_body(ui, ctx),
                     InspectorSection::FormatDiscovery => self.render_format_discovery_body(ui),
+                    InspectorSection::Duplicates => {},
                 });
             if !open {
                 self.detached.remove(&section);

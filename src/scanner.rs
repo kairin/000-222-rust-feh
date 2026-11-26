@@ -1,21 +1,28 @@
 // SPDX-License-Identifier: MIT
 //! Directory scanner (walkdir-based, with streaming scan support).
 
-use std::io::{self, Read};
+use std::collections::{BTreeMap, HashSet};
+use std::fs::{self, File, Metadata};
+use std::io::{self, Read, Seek, SeekFrom};
 use std::os::fd::OwnedFd;
 use std::os::unix::net::UnixStream;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
-use walkdir::WalkDir;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::{mpsc, Arc};
+use walkdir::WalkDir;
 
-use crate::types::{FileStatus, ImageEntry, ScanInventory};
+use crate::types::{
+    DuplicateGroup, DuplicateScanMsg, DuplicateScanSummary, FileStatus, ImageEntry, ScanInventory,
+};
 
 pub const MAGICK_IDENTIFY_CAP: usize = 500;
 pub const SCAN_WARNING_CAP: usize = 50;
 /// Emit partial scan updates every N native images so the list/feh can be used early.
 pub const SCAN_PROGRESS_EVERY: usize = 200;
+const DUP_PREFIX_BYTES: usize = 4096;
+const DUP_CHUNK_BYTES: usize = 65_536;
+const DUP_PROGRESS_EVERY: usize = 64;
 
 /// Format a walkdir error for the activity log (feature 004 / 011).
 pub fn format_walk_warning(err: &walkdir::Error) -> String {
@@ -324,9 +331,266 @@ fn is_magick_image(path: &Path, magick_bin: Option<&Path>, cancel: &AtomicBool) 
     }
 }
 
+#[cfg(unix)]
+type InodeKey = (u64, u64);
+#[cfg(not(unix))]
+type InodeKey = u64;
+
+#[cfg(unix)]
+fn inode_key(meta: &Metadata, _seq: &mut u64) -> InodeKey {
+    use std::os::unix::fs::MetadataExt;
+    (meta.dev(), meta.ino())
+}
+
+#[cfg(not(unix))]
+fn inode_key(_meta: &Metadata, seq: &mut u64) -> InodeKey {
+    let id = *seq;
+    *seq += 1;
+    id
+}
+
+fn filter_duplicate_candidates(candidates: &[PathBuf], current_dir: Option<&Path>) -> Vec<PathBuf> {
+    let quarantine_dir = current_dir.map(|cur| cur.join("duplicates"));
+    let mut seen = HashSet::with_capacity(candidates.len());
+    let mut filtered = Vec::with_capacity(candidates.len());
+    for path in candidates {
+        if quarantine_dir.as_ref().is_some_and(|q| path.starts_with(q)) {
+            continue;
+        }
+        if seen.insert(path.clone()) {
+            filtered.push(path.clone());
+        }
+    }
+    filtered
+}
+
+fn pick_default_keep(members: &[PathBuf], current_dir: Option<&Path>) -> HashSet<PathBuf> {
+    let mut keep = HashSet::new();
+    if let Some(best) = members.iter().min_by_key(|p| {
+        let rel = current_dir.and_then(|r| p.strip_prefix(r).ok()).unwrap_or(p);
+        (rel.components().count(), rel.as_os_str().len(), (*p).clone())
+    }) {
+        keep.insert(best.clone());
+    }
+    keep
+}
+
+fn build_duplicate_group(
+    byte_len: u64,
+    inode_classes: Vec<Vec<PathBuf>>,
+    current_dir: Option<&Path>,
+) -> DuplicateGroup {
+    let mut members: Vec<PathBuf> = inode_classes.into_iter().flatten().collect();
+    members.sort();
+    let keep = pick_default_keep(&members, current_dir);
+    DuplicateGroup {
+        byte_len,
+        members,
+        keep,
+    }
+}
+
+fn finish_duplicate_scan(
+    mut summary: DuplicateScanSummary,
+    generation: u64,
+    tx: &mpsc::Sender<DuplicateScanMsg>,
+    cancelled: bool,
+) -> DuplicateScanSummary {
+    if cancelled {
+        summary.cancelled = true;
+        summary.groups.clear();
+    } else {
+        summary
+            .groups
+            .sort_by(|a, b| (std::cmp::Reverse(a.byte_len), a.members.first()).cmp(&(
+                std::cmp::Reverse(b.byte_len),
+                b.members.first(),
+            )));
+    }
+    summary.warnings = summarize_scan_warnings(summary.warnings);
+    let _ = tx.send(DuplicateScanMsg::Complete {
+        generation,
+        summary: summary.clone(),
+    });
+    summary
+}
+
+fn read_chunk_at(path: &Path, offset: u64, max_len: usize) -> io::Result<Vec<u8>> {
+    let mut file = File::open(path)?;
+    if offset > 0 {
+        file.seek(SeekFrom::Start(offset))?;
+    }
+    let mut buf = vec![0u8; max_len];
+    let mut read_total = 0;
+    while read_total < max_len {
+        match file.read(&mut buf[read_total..]) {
+            Ok(0) => break,
+            Ok(n) => read_total += n,
+            Err(e) if e.kind() == io::ErrorKind::Interrupted => continue,
+            Err(e) => return Err(e),
+        }
+    }
+    buf.truncate(read_total);
+    Ok(buf)
+}
+
+fn partition_by_chunk(
+    inode_classes: Vec<Vec<PathBuf>>,
+    offset: u64,
+    chunk_size: usize,
+    cancel: &AtomicBool,
+    warnings: &mut Vec<String>,
+) -> Result<Vec<Vec<Vec<PathBuf>>>, ()> {
+    let mut sub_buckets: BTreeMap<Vec<u8>, Vec<Vec<PathBuf>>> = BTreeMap::new();
+    for paths in inode_classes {
+        if cancel.load(Ordering::Relaxed) {
+            return Err(());
+        }
+        match read_chunk_at(&paths[0], offset, chunk_size) {
+            Ok(chunk) if chunk.len() == chunk_size => {
+                sub_buckets.entry(chunk).or_default().push(paths);
+            }
+            Ok(_) => warnings.push(format!(
+                "Duplicate scan skip: {} (unexpected EOF)",
+                paths[0].display()
+            )),
+            Err(e) => warnings.push(format!("Duplicate scan skip: {} ({e})", paths[0].display())),
+        }
+    }
+    Ok(sub_buckets.into_values().collect())
+}
+
+fn collect_stage_a_buckets(
+    candidates: &[PathBuf],
+    generation: u64,
+    cancel: &AtomicBool,
+    tx: &mpsc::Sender<DuplicateScanMsg>,
+    summary: &mut DuplicateScanSummary,
+) -> Result<BTreeMap<u64, BTreeMap<InodeKey, Vec<PathBuf>>>, ()> {
+    let mut size_buckets: BTreeMap<u64, BTreeMap<InodeKey, Vec<PathBuf>>> = BTreeMap::new();
+    let mut seq = 0u64;
+    for path in candidates {
+        if cancel.load(Ordering::Relaxed) {
+            return Err(());
+        }
+        match fs::symlink_metadata(path) {
+            Ok(meta) if meta.file_type().is_file() => {
+                let key = inode_key(&meta, &mut seq);
+                size_buckets
+                    .entry(meta.len())
+                    .or_default()
+                    .entry(key)
+                    .or_default()
+                    .push(path.clone());
+            }
+            Ok(_) => {}
+            Err(e) => summary
+                .warnings
+                .push(format!("Duplicate scan skip: {} ({e})", path.display())),
+        }
+        summary.checked_files += 1;
+        if summary.checked_files % DUP_PROGRESS_EVERY == 0
+            || summary.checked_files == summary.total_candidates
+        {
+            let _ = tx.send(DuplicateScanMsg::Progress {
+                generation,
+                checked_files: summary.checked_files,
+                total_files: summary.total_candidates,
+            });
+        }
+    }
+    Ok(size_buckets)
+}
+
+fn refine_bucket_from_offset(
+    byte_len: u64,
+    initial: Vec<Vec<PathBuf>>,
+    current_dir: Option<&Path>,
+    cancel: &AtomicBool,
+    summary: &mut DuplicateScanSummary,
+) -> Result<(), ()> {
+    let mut pending = vec![initial];
+    let mut offset = 0u64;
+    while offset < byte_len && !pending.is_empty() {
+        let max_chunk = if offset == 0 {
+            DUP_PREFIX_BYTES
+        } else {
+            DUP_CHUNK_BYTES
+        };
+        let chunk_size = max_chunk.min((byte_len - offset) as usize);
+        let next_offset = offset + chunk_size as u64;
+        let mut next_pending = Vec::new();
+        for class in pending {
+            for sub in partition_by_chunk(class, offset, chunk_size, cancel, &mut summary.warnings)?
+            {
+                let count: usize = sub.iter().map(Vec::len).sum();
+                if count < 2 {
+                    continue;
+                }
+                if sub.len() == 1 || next_offset >= byte_len {
+                    summary
+                        .groups
+                        .push(build_duplicate_group(byte_len, sub, current_dir));
+                } else {
+                    next_pending.push(sub);
+                }
+            }
+        }
+        pending = next_pending;
+        offset = next_offset;
+    }
+    Ok(())
+}
+
+/// Find byte-identical files using 3-stage metadata, prefix, and 1-FD chunk reads.
+pub fn find_exact_duplicates_streaming(
+    candidates: &[PathBuf],
+    current_dir: Option<&Path>,
+    generation: u64,
+    cancel: &AtomicBool,
+    tx: &mpsc::Sender<DuplicateScanMsg>,
+) -> DuplicateScanSummary {
+    let filtered = filter_duplicate_candidates(candidates, current_dir);
+    let mut summary = DuplicateScanSummary {
+        total_candidates: filtered.len(),
+        ..Default::default()
+    };
+    if cancel.load(Ordering::Relaxed) {
+        return finish_duplicate_scan(summary, generation, tx, true);
+    }
+    let Ok(size_buckets) =
+        collect_stage_a_buckets(&filtered, generation, cancel, tx, &mut summary)
+    else {
+        return finish_duplicate_scan(summary, generation, tx, true);
+    };
+    for (byte_len, inode_map) in size_buckets {
+        let inode_classes: Vec<Vec<PathBuf>> = inode_map.into_values().collect();
+        let total_paths: usize = inode_classes.iter().map(Vec::len).sum();
+        if total_paths < 2 {
+            continue;
+        }
+        if byte_len == 0 || inode_classes.len() == 1 {
+            summary
+                .groups
+                .push(build_duplicate_group(byte_len, inode_classes, current_dir));
+            continue;
+        }
+        if refine_bucket_from_offset(byte_len, inode_classes, current_dir, cancel, &mut summary)
+            .is_err()
+        {
+            return finish_duplicate_scan(summary, generation, tx, true);
+        }
+    }
+    finish_duplicate_scan(summary, generation, tx, false)
+}
+
 #[cfg(test)]
 #[path = "../tests/unit/scanner_probes.rs"]
 mod probe_tests;
+
+#[cfg(test)]
+#[path = "../tests/unit/duplicate_scan.rs"]
+mod duplicate_scan;
 
 #[cfg(test)]
 mod tests {
