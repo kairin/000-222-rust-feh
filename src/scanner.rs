@@ -492,7 +492,7 @@ fn collect_stage_a_buckets(
                 .push(format!("Duplicate scan skip: {} ({e})", path.display())),
         }
         summary.checked_files += 1;
-        if summary.checked_files % DUP_PROGRESS_EVERY == 0
+        if summary.checked_files.is_multiple_of(DUP_PROGRESS_EVERY)
             || summary.checked_files == summary.total_candidates
         {
             let _ = tx.send(DuplicateScanMsg::Progress {
